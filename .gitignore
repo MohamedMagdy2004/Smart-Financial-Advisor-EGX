@@ -1,0 +1,65 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environments
+venv/
+env/
+ENV/
+.venv
+.venv1/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+!backend/.env.example
+!modal_functions/.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*.sublime-workspace
+
+# Data files (sensitive)
+financial_news.json
+*.json
+*.csv
+*.xlsx
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Flask
+instance/
+.webassets-cache
+*.db
+
+# Logs
+*.log
+logs/
+
+# Python cache in subfolders
+**/__pycache__/
