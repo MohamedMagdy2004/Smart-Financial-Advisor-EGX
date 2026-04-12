@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EGX - AI Financial Intelligence</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0b132b 0%, #1c2541 40%, #280875 100%);
+            color: #fff;
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Animated Neural Network Background - Lighter */
+        .neural-bg {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .neuron {
+            position: absolute;
+            width: 5px;
+            height: 5px;
+            background: rgba(0, 212, 255, 0.5);
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.6);
+            animation: pulse 3s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.2; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.3); }
+        }
+        .grid-bg {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(0, 255, 255, 0.04) 2px, transparent 2px),
+                linear-gradient(90deg, rgba(0, 255, 255, 0.04) 2px, transparent 2px);
+            background-size: 40px 40px;
+            pointer-events: none;
+            z-index: 0;
+        }
+        .app-container {
+            display: flex;
+            height: calc(100vh - 20px);
+            max-width: 1600px;
+            margin: 10px auto;
+            padding: 0 15px;
+            gap: 15px;
+            position: relative;
+            z-index: 2;
+        }
+
+        /* ========== LEFT SIDEBAR ========== */
+        .sidebar {
+            width: 280px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.2);
+            transition: all 0.3s;
+        }
+
+        .sidebar:hover {
+            border-color: rgba(0, 212, 255, 0.4);
+            box-shadow: 0 0 50px rgba(0, 212, 255, 0.2);
+        }
+
+        /* User Profile */
+        .user-profile {
+            padding: 20px 15px;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+            text-align: center;
+        }
+
+        .avatar {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #00d4ff, #0066ff);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            margin: 0 auto 10px;
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.4);
+        }
+
+        .user-name {
+            font-size: 16px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #fff, #00d4ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .user-email {
+            font-size: 10px;
+            color: #a0aec0;
+        }
+
+        .logout-btn {
+            margin-top: 12px;
+            padding: 8px 16px;
+            background: rgba(255, 68, 68, 0.15);
+            border: 1px solid rgba(255, 68, 68, 0.3);
+            border-radius: 10px;
+            color: #ff8888;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+            width: 100%;
+        }
+
+        .logout-btn:hover {
+            background: rgba(255, 68, 68, 0.25);
+            border-color: #ff4444;
+        }
+
+        /* Risk Settings */
+        .risk-settings {
+            padding: 15px;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+        }
+
+        .settings-title {
+            font-size: 12px;
+            color: #00d4ff;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .settings-title::before {
+            content: '';
+            width: 3px;
+            height: 12px;
+            background: #00d4ff;
+            border-radius: 2px;
+            box-shadow: 0 0 6px #00d4ff;
+        }
+
+        .setting-group {
+            margin-bottom: 10px;
+        }
+
+        .setting-group label {
+            display: block;
+            font-size: 10px;
+            color:#a0aec0;
+            margin-bottom: 4px;
+        }
+
+        .setting-group select, .setting-group input {
+            width: 100%;
+            padding: 7px 10px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 12px;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .setting-group select:focus, .setting-group input:focus {
+            outline: none;
+            border-color: #00d4ff;
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
+        }
+
+        .api-status {
+            margin-top: 12px;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            font-size: 10px;
+            text-align: center;
+        }
+
+        /* ========== MIDDLE CONTENT (Chat) ========== */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .header {
+            background: rgba(10, 14, 39, 0.75);
+            backdrop-filter: blur(15px);
+            border-radius: 18px;
+            padding: 10px 20px;
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-img {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #00d4ff, #0066ff);
+            border-radius: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: bold;
+            box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
+        }
+
+        .logo-text h1 {
+            font-size: 18px;
+            background: linear-gradient(135deg, #fff, #00d4ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .logo-text p {
+            font-size: 9px;
+            color: #a0aec0;
+        }
+
+        .pipeline-status {
+            text-align: right;
+        }
+
+        .pipeline-status .label {
+            font-size: 9px;
+            color: #a0aec0;
+        }
+
+        .pipeline-status .value {
+            font-size: 12px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .status-led {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            animation: blink 1.5s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .status-led.online {
+            background: #00ff88;
+            box-shadow: 0 0 6px #00ff88;
+        }
+
+        .status-led.offline {
+            background: #ff4444;
+        }
+
+        /* Chat Section */
+        .chat-section {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(15px);
+            border-radius: 20px;
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+        .chat-section:hover {
+            border-color: rgba(0, 212, 255, 0.4);
+            box-shadow: 0 0 40px rgba(0, 212, 255, 0.12);
+        }
+
+        .chat-header {
+            padding: 12px 18px;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .chat-header h2 {
+            font-size: 14px;
+            color: #00d4ff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .ai-badge {
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(0, 102, 255, 0.2));
+            padding: 3px 10px;
+            border-radius: 15px;
+            font-size: 9px;
+            border: 1px solid rgba(0, 212, 255, 0.3);
+        }
+
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-height: 350px;
+            max-height: calc(100vh - 200px);
+        }
+
+        .messages::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .messages::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+
+        .messages::-webkit-scrollbar-thumb {
+            background: #00d4ff;
+            border-radius: 10px;
+        }
+
+        .msg {
+            max-width: 80%;
+            padding: 8px 14px;
+            border-radius: 16px;
+            line-height: 1.4;
+            word-wrap: break-word;
+            font-size: 13px;
+            animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .msg.user {
+            align-self: flex-end;
+            background: #1d86e3;
+            padding: 10px;
+            border-radius: 15px 15px 0 15px;
+            color: white;
+        }
+
+        .msg.bot {
+            align-self: flex-start;
+            background: rgba(30, 41, 59, 0.9);
+            border-bottom-left-radius: 4px;
+            border: 1px solid rgba(0, 212, 255, 0.2);
+        }
+
+        .msg.decision {
+            align-self: flex-start;
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.12), rgba(0, 102, 255, 0.12));
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-bottom-left-radius: 4px;
+        }
+
+        .msg.meta {
+            font-size: 10px;
+            color: #a0aec0;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 6px 10px;
+            border-radius: 8px;
+            max-width: 90%;
+            font-family: monospace;
+            border-left: 2px solid #00d4ff;
+        }
+
+        .composer {
+            padding: 12px 18px;
+            border-top: 1px solid rgba(0, 255, 255, 0.1);
+            display: flex;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .composer textarea {
+            flex: 1;
+            padding: 10px 14px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            border-radius: 12px;
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+            font-size: 13px;
+            resize: none;
+            min-height: 40px;
+            transition: all 0.3s;
+        }
+
+        .composer textarea:focus {
+            outline: none;
+            border-color: #00d4ff;
+            box-shadow: 0 0 12px rgba(0, 212, 255, 0.2);
+        }
+
+        .composer button {
+            padding: 0 22px;
+            background: linear-gradient(135deg, #00d4ff, #0066ff);
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            font-weight: bold;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .composer button:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+        }
+
+        .composer button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* ========== RIGHT SIDEBAR ========== */
+        .right-sidebar {
+            width: 260px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.2);
+            transition: all 0.3s;
+        }
+        .right-sidebar:hover {
+            border-color: rgba(0, 212, 255, 0.4);
+            box-shadow: 0 0 50px rgba(0, 212, 255, 0.2);
+        }
+        .history-header {
+            padding: 15px;
+            border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .history-header h3 {
+            font-size: 12px;
+            color: #00d4ff;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .history-stats {
+            background: rgba(0, 212, 255, 0.15);
+            padding: 3px 8px;
+            border-radius: 15px;
+            font-size: 9px;
+        }
+
+        .chat-history-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+
+        .history-item {
+            background: rgba(0, 212, 255, 0.05);
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid rgba(0, 212, 255, 0.1);
+        }
+
+        .history-item:hover {
+            background: rgba(0, 212, 255, 0.12);
+            border-color: rgba(0, 212, 255, 0.3);
+            transform: translateX(-3px);
+        }
+
+        .history-company {
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #00d4ff;
+        }
+
+        .history-date {
+            font-size: 8px;
+            color: #a0aec0;
+            margin-bottom: 4px;
+        }
+
+        .history-preview {
+            font-size: 9px;
+            color: #cbd5e0;
+            line-height: 1.3;
+        }
+
+        .clear-history {
+            padding: 12px;
+            border-top: 1px solid rgba(0, 255, 255, 0.1);
+        }
+
+        .clear-btn {
+            width: 100%;
+            padding: 8px;
+            background: rgba(255, 68, 68, 0.1);
+            border: 1px solid rgba(255, 68, 68, 0.3);
+            border-radius: 10px;
+            color: #ff8888;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.3s;
+        }
+
+        .clear-btn:hover {
+            background: rgba(255, 68, 68, 0.2);
+        }
+
+        .footer {
+            text-align: center;
+            padding: 8px;
+            font-size: 9px;
+            color: #a0aec0;
+        }
+
+        @media (max-width: 1100px) {
+            .sidebar, .right-sidebar {
+                width: 240px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .app-container {
+                flex-direction: column;
+                height: auto;
+            }
+            .sidebar, .right-sidebar {
+                width: 100%;
+                max-height: 280px;
+            }
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="neural-bg" id="neuralBg"></div>
+    <div class="grid-bg"></div>
+    <div class="app-container">
+        <!-- LEFT SIDEBAR -->
+        <div class="sidebar">
+            <div class="user-profile">
+                <div class="avatar">👤</div>
+                <div class="user-name" id="userName">Loading...</div>
+                <div class="user-email" id="userEmail">Loading...</div>
+                <button class="logout-btn" id="logoutBtn">Logout</button>
+            </div>
+
+            <div class="risk-settings">
+                <div class="settings-title">
+                    ⚙️ Risk Engine
+                </div>
+                <div class="setting-group">
+                    <label>Risk Profile</label>
+                    <select id="riskProfile">
+                        <option value="">Auto (AI)</option>
+                        <option value="conservative">Conservative</option>
+                        <option value="moderate" selected>Moderate</option>
+                        <option value="aggressive">Aggressive</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label>Investment Horizon</label>
+                    <select id="horizon">
+                        <option value="short">Short (0-1y)</option>
+                        <option value="medium" selected>Medium (1-3y)</option>
+                        <option value="long">Long (3+y)</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label>Drawdown Tolerance</label>
+                    <select id="drawdown">
+                        <option value="low">Low (0-10%)</option>
+                        <option value="medium" selected>Medium (10-20%)</option>
+                        <option value="high">High (20-30%)</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label>Trading Style</label>
+                    <select id="style">
+                        <option value="defensive">Defensive</option>
+                        <option value="balanced" selected>Balanced</option>
+                        <option value="aggressive">Aggressive</option>
+                    </select>
+                </div>
+                <div class="setting-group">
+                    <label>Max News</label>
+                    <input id="maxNews" type="number" min="3" max="50" value="20">
+                </div>
+                <div class="api-status">
+                    🔌 API: <span id="apiStatus">Checking...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- MIDDLE CONTENT (Chat) -->
+        <div class="main-content">
+            <div class="header">
+                <div class="logo-area">
+                    <div class="logo-img">
+                    <img src="Chat bot logo.jpg" alt="EGX AI Bot" style="width: 100%; height: 100%; object-fit: cover; border-radius: 100px;">
+                    </div>
+                    <div class="logo-text">
+                        <h1>EGX AI FINANCIAL BOT</h1>
+                        <p>Egyptian Stock Exchange Intelligence</p>
+                    </div>
+                </div>
+                <div class="pipeline-status">
+                    <div class="label">Pipeline Status</div>
+                    <div class="value">
+                        <span class="status-led online" id="statusLed"></span>
+                        <span id="pipelineStatus">Active</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-section">
+                <div class="chat-header">
+                    <h2>
+                        💬 AI Chat Interface
+                        <span class="ai-badge">Qwen2.5-1.5B</span>
+                    </h2>
+                </div>
+                <div class="messages" id="messages">
+                    <div class="msg bot">
+                        🤖 <strong>EGX AI Bot Online</strong><br><br>
+                        Ask me about Egyptian stocks:<br>
+                        • "Analyze COMI"<br>
+                        • "Should I buy Elsewedy?"<br>
+                        • "Sentiment for TMG"
+                    </div>
+                </div>
+                <div class="composer">
+                    <textarea id="messageInput" placeholder="Type your question..." rows="1"></textarea>
+                    <button id="sendBtn">Send</button>
+                </div>
+            </div>
+
+            <div class="footer">
+                EGX AI | News Extraction → Financial Analysis → Decision
+            </div>
+        </div>
+
+        <!-- RIGHT SIDEBAR (Chat History) -->
+        <div class="right-sidebar">
+            <div class="history-header">
+                <h3>📜 Conversation History</h3>
+                <div class="history-stats" id="historyCount">0</div>
+            </div>
+            <div class="chat-history-list" id="historyList">
+                <div style="text-align: center; padding: 30px 15px; color: #a0aec0; font-size: 11px;">
+                    No conversations yet.
+                </div>
+            </div>
+            <div class="clear-history">
+                <button class="clear-btn" id="clearHistoryBtn">🗑️ Clear History</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Neural Network Background
+        function createNeuralNetwork() {
+            const container = document.getElementById('neuralBg');
+            for (let i = 0; i < 40; i++) {
+                const neuron = document.createElement('div');
+                neuron.className = 'neuron';
+                neuron.style.left = Math.random() * 100 + '%';
+                neuron.style.top = Math.random() * 100 + '%';
+                neuron.style.animationDelay = Math.random() * 3 + 's';
+                neuron.style.animationDuration = 2 + Math.random() * 2 + 's';
+                container.appendChild(neuron);
+            }
+        }
+        createNeuralNetwork();
+
+        // API Configuration
+        const API_BASE = "http://localhost:8000";
+        const messagesEl = document.getElementById("messages");
+        const sendBtn = document.getElementById("sendBtn");
+        const inputEl = document.getElementById("messageInput");
+        const apiStatusEl = document.getElementById("apiStatus");
+
+        // User Session
+        const currentUser = JSON.parse(localStorage.getItem('egx_current_user'));
+        if (!currentUser) {
+            window.location.href = 'index.html';
+        }
+
+        document.getElementById('userName').textContent = currentUser.username;
+        document.getElementById('userEmail').textContent = currentUser.email;
+
+        document.getElementById('logoutBtn').addEventListener('click', function() {
+            localStorage.removeItem('egx_current_user');
+            window.location.href = 'index.html';
+        });
+
+        function addMessage(text, role = "bot", isMeta = false) {
+            const div = document.createElement("div");
+            div.className = `msg ${role}`;
+            if (isMeta) div.classList.add("meta");
+            div.textContent = text;
+            messagesEl.appendChild(div);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        function addDecisionMessage(decision, reason) {
+            const decisionColor = decision === "BUY" ? "🟢 BUY" : (decision === "SELL" ? "🔴 SELL" : "⚪ HOLD");
+            const div = document.createElement("div");
+            div.className = "msg decision";
+            div.innerHTML = `<strong>📊 Decision: ${decisionColor}</strong><br><br>${reason}`;
+            messagesEl.appendChild(div);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        function buildPayload(message) {
+            return {
+                message: message,
+                max_news: Number(document.getElementById("maxNews").value || 20),
+                user_risk_profile: document.getElementById("riskProfile").value || null,
+                risk_answers: {
+                    investment_horizon: document.getElementById("horizon").value,
+                    max_drawdown_tolerance: document.getElementById("drawdown").value,
+                    style: document.getElementById("style").value
+                }
+            };
+        }
+
+        async function checkApi() {
+            try {
+                const res = await fetch(`${API_BASE}/health`);
+                if (!res.ok) throw new Error();
+                apiStatusEl.textContent = "Online ✅";
+                apiStatusEl.style.color = "#22c55e";
+                document.getElementById('pipelineStatus').innerHTML = "Active";
+                document.getElementById('statusLed').className = "status-led online";
+            } catch {
+                apiStatusEl.textContent = "Offline ❌";
+                apiStatusEl.style.color = "#ef4444";
+                document.getElementById('pipelineStatus').innerHTML = "Offline";
+                document.getElementById('statusLed').className = "status-led offline";
+            }
+        }
+
+        async function sendMessage() {
+            const message = inputEl.value.trim();
+            if (!message) return;
+
+            addMessage(message, "user");
+            inputEl.value = "";
+            sendBtn.disabled = true;
+
+            const loadingMsg = document.createElement("div");
+            loadingMsg.className = "msg bot";
+            loadingMsg.innerHTML = "⏳ Processing...";
+            messagesEl.appendChild(loadingMsg);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+
+            try {
+                const payload = buildPayload(message);
+                const response = await fetch(`${API_BASE}/chat/message`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+
+                loadingMsg.remove();
+                const data = await response.json();
+
+                if (!response.ok || data.status !== "success") {
+                    throw new Error(data?.error || data?.detail || "Request failed");
+                }
+
+                const finalResult = data.final_result || {};
+                const decision = finalResult?.decision_translator?.buy_or_not || "HOLD";
+                const simpleReason = finalResult?.decision_translator?.simple_reason || data.chat_reply || "Analysis completed";
+
+                addDecisionMessage(decision, simpleReason);
+
+                const metadata = `📁 Ticker: ${data.ticker || 'N/A'} | Risk: ${data.risk_profile_used || 'N/A'}`;
+                addMessage(metadata, "bot", true);
+
+                saveToHistory(data.ticker || 'Unknown', message.substring(0, 40));
+
+            } catch (err) {
+                loadingMsg.remove();
+                addMessage(`❌ Error: ${err.message}`, "bot");
+            } finally {
+                sendBtn.disabled = false;
+                inputEl.focus();
+            }
+        }
+
+        function saveToHistory(ticker, preview) {
+            const history = JSON.parse(localStorage.getItem(`egx_history_${currentUser.username}`) || '[]');
+            const newEntry = {
+                ticker: ticker,
+                preview: preview,
+                date: new Date().toISOString()
+            };
+            const filtered = history.filter(h => h.ticker !== ticker);
+            filtered.unshift(newEntry);
+            localStorage.setItem(`egx_history_${currentUser.username}`, JSON.stringify(filtered.slice(0, 15)));
+            loadHistory();
+        }
+
+        function loadHistory() {
+            const history = JSON.parse(localStorage.getItem(`egx_history_${currentUser.username}`) || '[]');
+            document.getElementById('historyCount').textContent = `${history.length}`;
+            
+            if (history.length > 0) {
+                const historyHtml = history.map((h, idx) => `
+                    <div class="history-item" data-index="${idx}">
+                        <div class="history-company">📌 ${h.ticker}</div>
+                        <div class="history-date">${new Date(h.date).toLocaleDateString()}</div>
+                        <div class="history-preview">${h.preview.substring(0, 35)}...</div>
+                    </div>
+                `).join('');
+                document.getElementById('historyList').innerHTML = historyHtml;
+                
+                document.querySelectorAll('.history-item').forEach(item => {
+                    item.addEventListener('click', function() {
+                        const idx = parseInt(this.dataset.index);
+                        const query = history[idx]?.preview;
+                        if (query) {
+                            inputEl.value = query;
+                            sendMessage();
+                        }
+                    });
+                });
+            } else {
+                document.getElementById('historyList').innerHTML = '<div style="text-align: center; padding: 30px 15px; color: #a0aec0; font-size: 11px;">No conversations yet.</div>';
+            }
+        }
+
+        function clearHistory() {
+            if (confirm('Clear all conversation history?')) {
+                localStorage.removeItem(`egx_history_${currentUser.username}`);
+                loadHistory();
+                addMessage("🗑️ History cleared.", "bot");
+            }
+        }
+
+        sendBtn.addEventListener("click", sendMessage);
+        inputEl.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+        document.getElementById('clearHistoryBtn').addEventListener('click', clearHistory);
+
+        inputEl.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(80, this.scrollHeight) + 'px';
+        });
+
+        checkApi();
+        loadHistory();
+        setInterval(checkApi, 30000);
+        inputEl.focus();
+    </script>
+</body>
+</html>
