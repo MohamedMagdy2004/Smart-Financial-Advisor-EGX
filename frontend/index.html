@@ -1,260 +1,242 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EGX Chatbot Pipeline</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EGX AI Bot - Login</title>
     <style>
-        * { box-sizing: border-box; }
-        body {
+        * {
             margin: 0;
-            font-family: "Segoe UI", Tahoma, sans-serif;
-            background: #0f172a;
-            color: #e2e8f0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        .layout {
-            max-width: 1100px;
-            margin: 20px auto;
-            display: grid;
-            grid-template-columns: 320px 1fr;
-            gap: 16px;
-            padding: 0 16px;
-        }
-        .panel {
-            background: #111827;
-            border: 1px solid #1f2937;
-            border-radius: 12px;
-            padding: 14px;
-        }
-        h1, h2 { margin: 0 0 12px; }
-        h1 { font-size: 20px; }
-        h2 { font-size: 16px; color: #93c5fd; }
-        label { display: block; font-size: 13px; margin: 10px 0 6px; color: #bfdbfe; }
-        select, input, textarea, button {
-            width: 100%;
-            border-radius: 8px;
-            border: 1px solid #334155;
-            background: #0b1220;
-            color: #e2e8f0;
-            padding: 10px;
-        }
-        textarea { min-height: 64px; resize: vertical; }
-        button {
-            background: #2563eb;
-            border: none;
-            font-weight: 600;
-            cursor: pointer;
-        }
-        button:disabled { opacity: .6; cursor: not-allowed; }
-        .chat {
-            height: 72vh;
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0b132b 0%, #1c2541 40%, #280875 100%);
+            min-height: 100vh;
             display: flex;
-            flex-direction: column;
-            gap: 10px;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
         }
-        .messages {
-            flex: 1;
-            overflow: auto;
-            border: 1px solid #1f2937;
-            border-radius: 10px;
-            background: #020617;
-            padding: 12px;
+
+        /* Neural network background */
+        body::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(0, 255, 255, 0.03) 2px, transparent 2px),
+                linear-gradient(90deg, rgba(0, 255, 255, 0.03) 2px, transparent 2px);
+            background-size: 50px 50px;
+            pointer-events: none;
         }
-        .msg {
-            max-width: 85%;
-            margin: 8px 0;
-            padding: 10px 12px;
-            border-radius: 10px;
-            line-height: 1.5;
-            white-space: pre-wrap;
+
+        .container {
+            position: relative;
+            z-index: 2;
+            width: 100%;
+            max-width: 450px;
+            padding: 20px;
         }
-        .user { margin-right: auto; background: #1d4ed8; }
-        .bot { margin-left: auto; background: #1f2937; }
-        .meta {
-            margin-top: 8px;
-            padding: 10px;
-            background: #0b1220;
-            border: 1px dashed #334155;
-            border-radius: 8px;
+
+        .login-card {
+            background: rgba(10, 14, 39, 0.8);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 40px 35px;
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 35px;
+        }
+
+        .logo-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #00d4ff, #0066ff);
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #fff;
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.3);
+        }
+
+        .logo h1 {
+            font-size: 24px;
+            background: linear-gradient(135deg, #fff, #00d4ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+         .logo p {
             font-size: 12px;
-            color: #cbd5e1;
+            color: #a0aec0;
+            margin-top: 5px;
         }
-        .composer { display: grid; grid-template-columns: 1fr 120px; gap: 8px; }
-        .small { font-size: 12px; color: #94a3b8; }
-        @media (max-width: 900px) {
-            .layout { grid-template-columns: 1fr; }
-            .chat { height: 70vh; }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 13px;
+            color: #a0aec0;
+            margin-bottom: 8px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 14px 16px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(0, 212, 255, 0.3);
+            border-radius: 12px;
+            color: #fff;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #00d4ff;
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
+        }
+
+        .input-group input::placeholder {
+            color: rgba(255, 255, 255, 0.25);
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #00d4ff, #0066ff);
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+
+        .login-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.3);
+        }
+
+        .register-link {
+            text-align: center;
+            margin-top: 25px;
+            font-size: 14px;
+            color: #a0aec0;
+        }
+
+        .register-link a {
+            color: #00d4ff;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .register-link a:hover {
+            text-decoration: underline;
+            color: #00ff88;
+        }
+
+        .error-message {
+            background: rgba(255, 68, 68, 0.2);
+            border: 1px solid rgba(255, 68, 68, 0.5);
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #ff8888;
+            text-align: center;
+            display: none;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 11px;
+            color: rgba(160, 174, 192, 0.5);
         }
     </style>
 </head>
 <body>
-    <div class="layout">
-        <aside class="panel">
-            <h1>🤖 EGX Chatbot</h1>
-            <div class="small">هذا الشات يشغّل تلقائيًا: تحديد السهم → جزء 1 → جزء 2 → قرار نهائي.</div>
-
-            <h2 style="margin-top:16px;">إعدادات المخاطر</h2>
-            <label for="riskProfile">Risk Profile (اختياري)</label>
-            <select id="riskProfile">
-                <option value="">Auto (from answers)</option>
-                <option value="conservative">conservative</option>
-                <option value="moderate" selected>moderate</option>
-                <option value="aggressive">aggressive</option>
-            </select>
-
-            <label for="horizon">Investment Horizon</label>
-            <select id="horizon">
-                <option value="short">short</option>
-                <option value="medium" selected>medium</option>
-                <option value="long">long</option>
-            </select>
-
-            <label for="drawdown">Max Drawdown Tolerance</label>
-            <select id="drawdown">
-                <option value="low">low</option>
-                <option value="medium" selected>medium</option>
-                <option value="high">high</option>
-            </select>
-
-            <label for="style">Trading Style</label>
-            <select id="style">
-                <option value="defensive">defensive</option>
-                <option value="balanced" selected>balanced</option>
-                <option value="aggressive">aggressive</option>
-            </select>
-
-            <label for="maxNews">Max News</label>
-            <input id="maxNews" type="number" min="3" max="50" value="20" />
-
-            <div class="small" style="margin-top:12px;">Backend API: <span id="apiStatus">checking...</span></div>
-        </aside>
-
-        <main class="panel chat">
-            <h2>المحادثة</h2>
-            <div id="messages" class="messages">
-                <div class="msg bot">اكتب طلبك مثل: "حلّل سهم التجاري الدولي وهل أشتري الآن؟"</div>
+    <div class="container">
+        <div class="login-card">
+            <div class="logo">
+                <div class="logo-img">
+                    <img src="Chat bot logo.jpg" alt="EGX AI Bot" style="width: 45%; height: 45%; object-fit: cover; border-radius: 100px;">
+                </div>
+                <h1>EGX AI FINANCIAL BOT</h1>
+                <p>Egyptian Stock Exchange Intelligence</p>
             </div>
 
-            <div class="composer">
-                <textarea id="messageInput" placeholder="اكتب رسالتك هنا..."></textarea>
-                <button id="sendBtn">إرسال</button>
+            <div class="error-message" id="errorMessage">Invalid username or password</div>
+
+            <form id="loginForm">
+                <div class="input-group">
+                    <label>Username</label>
+                    <input type="text" id="username" placeholder="Enter your username" required>
+                </div>
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="password" placeholder="Enter your password" required>
+                </div>
+                <button type="submit" class="login-btn">🔐 Login</button>
+            </form>
+
+            <div class="register-link">
+                Don't have an account? <a href="register.html">Register</a>
             </div>
-        </main>
+            <div class="footer">
+                EGX AI Bot v1.0
+            </div>
+        </div>
     </div>
 
     <script>
-        const API_BASE = "http://localhost:8000";
-        const messagesEl = document.getElementById("messages");
-        const sendBtn = document.getElementById("sendBtn");
-        const inputEl = document.getElementById("messageInput");
-        const apiStatusEl = document.getElementById("apiStatus");
-
-        function addMessage(text, role = "bot", meta = null) {
-            const div = document.createElement("div");
-            div.className = `msg ${role}`;
-            div.textContent = text;
-            messagesEl.appendChild(div);
-
-            if (meta) {
-                const metaDiv = document.createElement("div");
-                metaDiv.className = "meta";
-                metaDiv.textContent = meta;
-                messagesEl.appendChild(metaDiv);
-            }
-
-            messagesEl.scrollTop = messagesEl.scrollHeight;
-        }
-
-        function buildPayload() {
-            return {
-                message: inputEl.value.trim(),
-                max_news: Number(document.getElementById("maxNews").value || 20),
-                user_risk_profile: document.getElementById("riskProfile").value || null,
-                risk_answers: {
-                    investment_horizon: document.getElementById("horizon").value,
-                    max_drawdown_tolerance: document.getElementById("drawdown").value,
-                    style: document.getElementById("style").value
-                }
-            };
-        }
-
-        async function checkApi() {
-            try {
-                const res = await fetch(`${API_BASE}/health`);
-                if (!res.ok) throw new Error();
-                apiStatusEl.textContent = "online ✅";
-                apiStatusEl.style.color = "#22c55e";
-            } catch {
-                apiStatusEl.textContent = "offline ❌";
-                apiStatusEl.style.color = "#ef4444";
-            }
-        }
-
-        async function sendMessage() {
-    const payload = buildPayload();
-    if (!payload.message) return;
-
-    addMessage(payload.message, "user");
-    inputEl.value = "";
-    sendBtn.disabled = true;
-
-    // 1. فحص مبدئي: هل الرسالة شكلها طلب تحليل؟ (عشان نظهر جملة الـ Pipeline)
-    const isFinancialQuery = /([A-Z]{4}|حلل|سهم|بورصة|analyze|stock)/i.test(payload.message);
-    let loadingMsg = null;
-
-    if (isFinancialQuery) {
-        loadingMsg = addMessage("جاري تشغيل الـ Pipeline الكامل وتحليل البيانات السحابية...", "bot");
-    }
-
-    try {
-        const res = await fetch(`${API_BASE}/chat/message`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        });
-
-        const data = await res.json();
-
-        // مسح رسالة التحميل لو ظهرت
-        if (loadingMsg) loadingMsg.remove();
-
-        if (!res.ok) throw new Error(data?.detail || "Request failed");
-
-        // 2. التحقق: هل الرد دردشة عامة أم تحليل مالي؟
-        if (data.final_result && data.final_result.status === "chat_only") {
-            // رد دردشة عامة: عرض الرد فقط بدون قرار أو بيانات تقنية
-            addMessage(data.chat_reply, "bot");
-        } else {
-            // رد تحليل مالي: عرض القرار والبيانات التقنية (Metadata)
-            const finalResult = data.final_result || {};
-            const decision = finalResult?.decision_translator?.buy_or_not || "N/A";
-            const reason = data.chat_reply || "No summary available.";
-
-            addMessage(`القرار: ${decision}\n\n${reason}`, "bot",
-                `Ticker: ${data.ticker}\n` +
-                `Risk Profile: ${data.risk_profile_used}\n` +
-                `Part1 (News): ${data.part1_news_output}\n` +
-                `Part2 (Finance): ${data.part2_financial_output}\n` +
-                `Part3 (Final): ${data.part3_decision_output}`
-            );
-        }
-    } catch (err) {
-        if (loadingMsg) loadingMsg.remove();
-        addMessage(`حدث خطأ: ${err.message}`, "bot");
-    } finally {
-        sendBtn.disabled = false;
-    }
-}
-
-        sendBtn.addEventListener("click", sendMessage);
-        inputEl.addEventListener("keydown", (e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            // Get registered users from localStorage
+            const users = JSON.parse(localStorage.getItem('egx_users') || '[]');
+            const user = users.find(u => u.username === username && u.password === password);
+            
+            if (user) {
+                // Save current user session
+                localStorage.setItem('egx_current_user', JSON.stringify({
+                    username: user.username,
+                    email: user.email
+                }));
+                // Redirect to dashboard
+                window.location.href = 'dashboard.html';
+            } else {
+                const errorMsg = document.getElementById('errorMessage');
+                errorMsg.style.display = 'block';
+                setTimeout(() => {
+                    errorMsg.style.display = 'none';
+                }, 3000);
             }
         });
-
-        checkApi();
     </script>
 </body>
 </html>
