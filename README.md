@@ -35,10 +35,13 @@
 
 ```bash
 cd backend
-docker compose up 
+docker compose up
+ipython
+import models , db
+db.create_tables()
 python -m uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 ```
-
+ 
 ### 2) شغّل الـ Frontend
 
 في Terminal جديد:
