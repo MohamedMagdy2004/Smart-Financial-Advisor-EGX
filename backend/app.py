@@ -5,13 +5,19 @@ Provides REST API for scraping, analyzing, and retrieving financial news
 import logging
 import json
 from typing import Optional, List
-from fastapi import FastAPI, HTTPException, Query
+from uuid import UUID
+from fastapi import FastAPI, HTTPException, Query , Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel
 import os
 from datetime import datetime
 from pathlib import Path
+from db import get_db
+from sqlalchemy.orm import Session
+import models
+import services
+from schemas import User, UserCreate, UserUpdate, UserList, LoginRequest, Message , MessageCreate , MessageList
 
 from config import (
     API_HOST, API_PORT, CORS_ORIGINS, COMPANIES, OUTPUT_SCHEME, DEBUG
@@ -410,6 +416,73 @@ async def get_output_schema():
         }
     }
 
+@app.get("/users", tags=["Users"], response_model=UserList)
+async def list_users(db: Session = Depends(get_db)):
+    """List all users"""
+    users = services.get_users(db)
+    return UserList(count=len(users), users=[User.from_orm(u) for u in users])
+
+@app.get("/users/{email}", tags=["Users"], response_model=User)
+async def get_user(email: str, db: Session = Depends(get_db)):
+    """Get user by email"""
+    user = services.get_user(db, email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return User.from_orm(user)
+
+@app.post("/users", tags=["Users"], response_model=User)
+async def create_user(user_data: UserCreate, db: Session = Depends(get_db)):
+    """Create a new user"""
+    existing_user = services.get_user(db, user_data.email)
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    user = services.create_user(db, user_data)
+    return User.from_orm(user)
+
+@app.put("/users/{user_id}", tags=["Users"], response_model=User)
+async def update_user(user_id: UUID, user_data: UserUpdate, db: Session = Depends(get_db)):
+    """Update user information"""
+    updated_user = services.update_user(db, user_id, user_data)
+    if not updated_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return User.from_orm(updated_user)
+
+@app.delete("/users/{user_id}", tags=["Users"], response_model=User)
+async def delete_user(user_id: UUID, db: Session = Depends(get_db)):
+    """Delete a user"""
+    deleted_user = services.delete_user(db, user_id)
+    if not deleted_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return User.from_orm(deleted_user)
+
+@app.post("/login", tags=["Users"])
+async def login(request: LoginRequest, db: Session = Depends(get_db)):
+    """Authenticate a user"""
+    user = services.authenticate_user(db, request.email, request.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    return {"message": "Login successful", "user": User.from_orm(user)}
+
+@app.get("/messages/{user_id}", tags=["Messages"])
+async def list_message(user_id: UUID, db: Session = Depends(get_db)):
+    """List all messages for a specific user"""
+    messages = services.get_message(db, user_id=user_id)
+    return [Message.from_orm(m) for m in messages]
+
+@app.post("/messages", tags=["Messages"], response_model=Message)
+async def create_message(message_data: MessageCreate, db: Session = Depends(get_db)):
+    """Create a new message"""
+    message = services.create_message(db, message_data)
+    return Message.from_orm(message)
+    
+
+@app.delete("/messages/{message_id}", tags=["Messages"], response_model=Message)
+async def delete_message(message_id: UUID, db: Session = Depends(get_db)):
+    """Delete a message"""
+    deleted_message = services.delete_message(db, message_id)
+    if not deleted_message:
+        raise HTTPException(status_code=404, detail="Message not found")
+    return Message.from_orm(deleted_message)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ERROR HANDLERS

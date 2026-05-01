@@ -732,11 +732,12 @@
 
         // User Session
         const currentUser = JSON.parse(localStorage.getItem('egx_current_user'));
-        if (!currentUser) {
+        if (!currentUser || !currentUser.id) {
             window.location.href = 'index.html';
         }
+        const userId = currentUser.id;
 
-        document.getElementById('userName').textContent = currentUser.username;
+        document.getElementById('userName').textContent = currentUser.username || currentUser.full_name || currentUser.email;
         document.getElementById('userEmail').textContent = currentUser.email;
 
         document.getElementById('logoutBtn').addEventListener('click', function() {
@@ -791,6 +792,60 @@
             }
         }
 
+        async function saveUserMessage(content) {
+            try {
+                await fetch(`${API_BASE}/messages`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        role: "user",
+                        content: content,
+                        user_id: userId
+                    })
+                });
+            } catch (err) {
+                console.warn('Unable to save message:', err);
+            }
+        }
+
+        async function saveBotMessage(content, llmOutput = null) {
+            try {
+                await fetch(`${API_BASE}/messages`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        role: "assistant",
+                        content: content,
+                        user_id: userId,
+                        llm_output: llmOutput
+                    })
+                });
+            } catch (err) {
+                console.warn('Unable to save bot message:', err);
+            }
+        }
+
+        async function loadPreviousMessages() {
+            messagesEl.innerHTML = '';
+            try {
+                const response = await fetch(`${API_BASE}/messages/${userId}`);
+                if (!response.ok) throw new Error('Failed to load messages');
+                const messages = await response.json();
+
+                if (Array.isArray(messages) && messages.length > 0) {
+                    messages.forEach(msg => {
+                        addMessage(msg.content, msg.role === 'assistant' ? 'bot' : 'user');
+                    });
+                } else {
+                    addMessage('🤖 EGX AI Bot Online\n\nAsk me about Egyptian stocks:\n• "Analyze COMI"\n• "Should I buy Elsewedy?"\n• "Sentiment for TMG"', 'bot');
+                }
+            } catch (err) {
+                console.warn(err);
+                messagesEl.innerHTML = '';
+                addMessage('🤖 EGX AI Bot Online\n\nAsk me about Egyptian stocks:\n• "Analyze COMI"\n• "Should I buy Elsewedy?"\n• "Sentiment for TMG"', 'bot');
+            }
+        }
+
         async function sendMessage() {
             const message = inputEl.value.trim();
             if (!message) return;
@@ -798,6 +853,8 @@
             addMessage(message, "user");
             inputEl.value = "";
             sendBtn.disabled = true;
+
+            await saveUserMessage(message);
 
             const loadingMsg = document.createElement("div");
             loadingMsg.className = "msg bot";
@@ -828,6 +885,10 @@
 
                 const metadata = `📁 Ticker: ${data.ticker || 'N/A'} | Risk: ${data.risk_profile_used || 'N/A'}`;
                 addMessage(metadata, "bot", true);
+
+                // Save bot response to DB
+                const botContent = `📊 Decision: ${decision === "BUY" ? "🟢 BUY" : decision === "SELL" ? "🔴 SELL" : "⚪ HOLD"}\n\n${simpleReason}\n\n${metadata}`;
+                await saveBotMessage(botContent, finalResult);
 
                 saveToHistory(data.ticker || 'Unknown', message.substring(0, 40));
 
@@ -906,6 +967,7 @@
 
         checkApi();
         loadHistory();
+        loadPreviousMessages();
         setInterval(checkApi, 30000);
         inputEl.focus();
     </script>

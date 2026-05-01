@@ -191,8 +191,8 @@
 
             <form id="loginForm">
                 <div class="input-group">
-                    <label>Username</label>
-                    <input type="text" id="username" placeholder="Enter your username" required>
+                    <label>Email</label>
+                    <input type="email" id="username" placeholder="Enter your email" required>
                 </div>
                 <div class="input-group">
                     <label>Password</label>
@@ -211,26 +211,46 @@
     </div>
 
     <script>
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
             
-            // Get registered users from localStorage
-            const users = JSON.parse(localStorage.getItem('egx_users') || '[]');
-            const user = users.find(u => u.username === username && u.password === password);
-            
-            if (user) {
-                // Save current user session
-                localStorage.setItem('egx_current_user', JSON.stringify({
-                    username: user.username,
-                    email: user.email
-                }));
-                // Redirect to dashboard
-                window.location.href = 'dashboard.html';
-            } else {
+            try {
+                const response = await fetch('http://localhost:8000/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: username,
+                        password: password
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.user) {
+                    // Save current user session
+                    localStorage.setItem('egx_current_user', JSON.stringify({
+                        username: data.user.full_name,
+                        email: data.user.email,
+                        id: data.user.id
+                    }));
+                    // Redirect to dashboard
+                    window.location.href = 'dashboard.html';
+                } else {
+                    const errorMsg = document.getElementById('errorMessage');
+                    errorMsg.textContent = data.detail || 'Invalid email or password';
+                    errorMsg.style.display = 'block';
+                    setTimeout(() => {
+                        errorMsg.style.display = 'none';
+                    }, 3000);
+                }
+            } catch (error) {
                 const errorMsg = document.getElementById('errorMessage');
+                errorMsg.textContent = 'Cannot connect to server';
                 errorMsg.style.display = 'block';
                 setTimeout(() => {
                     errorMsg.style.display = 'none';
