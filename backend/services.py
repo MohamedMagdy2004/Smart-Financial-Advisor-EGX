@@ -97,3 +97,10 @@ def delete_message(db: Session, message_id: uuid.UUID):
     db.delete(message_instance)
     db.commit()
     return message_instance
+
+def delete_messages_by_user(db: Session, user_id: uuid.UUID):
+    messages = db.query(Message).filter(Message.user_id == user_id).all()
+    for message in messages:
+        db.delete(message)
+    db.commit()
+    return messages

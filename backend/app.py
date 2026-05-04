@@ -484,6 +484,12 @@ async def delete_message(message_id: UUID, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Message not found")
     return Message.from_orm(deleted_message)
 
+@app.delete("/messages/user/{user_id}", tags=["Messages"])
+async def delete_messages_by_user(user_id: UUID, db: Session = Depends(get_db)):
+    """Delete all messages for a specific user"""
+    deleted_messages = services.delete_messages_by_user(db, user_id)
+    return {"deleted_count": len(deleted_messages), "messages": [Message.from_orm(m) for m in deleted_messages]}
+
 # ─────────────────────────────────────────────────────────────────────────────
 # ERROR HANDLERS
 # ─────────────────────────────────────────────────────────────────────────────

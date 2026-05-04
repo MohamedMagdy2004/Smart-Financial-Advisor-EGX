@@ -27,12 +27,14 @@ ENV/
 .venv
 .venv1/
 
+
 # Local environment files
 .env
 .env.*
 !.env.example
 !backend/.env.example
 !modal_functions/.env.example
+uv.lock
 
 # IDE
 .vscode/

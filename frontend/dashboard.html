@@ -556,6 +556,10 @@
             background: rgba(255, 68, 68, 0.2);
         }
 
+        .delete-btn {
+            margin-top: 10px;
+        }
+
         .footer {
             text-align: center;
             padding: 8px;
@@ -834,7 +838,19 @@
 
                 if (Array.isArray(messages) && messages.length > 0) {
                     messages.forEach(msg => {
-                        addMessage(msg.content, msg.role === 'assistant' ? 'bot' : 'user');
+                        if (msg.role === 'assistant' && msg.llm_output?.assistant_text) {
+                            addMessage(msg.content, 'user');
+                            addDecisionMessage(msg.llm_output.decision || 'HOLD', msg.llm_output.assistant_text);
+                            if (msg.llm_output.metadata) {
+                                addMessage(
+                                    `📁 Ticker: ${msg.llm_output.metadata.ticker || 'N/A'} | Risk: ${msg.llm_output.metadata.risk_profile_used || 'N/A'}`,
+                                    'bot',
+                                    true
+                                );
+                            }
+                        } else {
+                            addMessage(msg.content, msg.role === 'assistant' ? 'bot' : 'user');
+                        }
                     });
                 } else {
                     addMessage('🤖 EGX AI Bot Online\n\nAsk me about Egyptian stocks:\n• "Analyze COMI"\n• "Should I buy Elsewedy?"\n• "Sentiment for TMG"', 'bot');
@@ -853,8 +869,6 @@
             addMessage(message, "user");
             inputEl.value = "";
             sendBtn.disabled = true;
-
-            await saveUserMessage(message);
 
             const loadingMsg = document.createElement("div");
             loadingMsg.className = "msg bot";
@@ -883,12 +897,19 @@
 
                 addDecisionMessage(decision, simpleReason);
 
-                const metadata = `📁 Ticker: ${data.ticker || 'N/A'} | Risk: ${data.risk_profile_used || 'N/A'}`;
-                addMessage(metadata, "bot", true);
+                const metadata = {
+                    ticker: data.ticker || 'N/A',
+                    risk_profile_used: data.risk_profile_used || 'N/A'
+                };
+                addMessage(`📁 Ticker: ${metadata.ticker} | Risk: ${metadata.risk_profile_used}`, "bot", true);
 
-                // Save bot response to DB
-                const botContent = `📊 Decision: ${decision === "BUY" ? "🟢 BUY" : decision === "SELL" ? "🔴 SELL" : "⚪ HOLD"}\n\n${simpleReason}\n\n${metadata}`;
-                await saveBotMessage(botContent, finalResult);
+                // Save the user question and assistant output in the same DB row
+                await saveBotMessage(message, {
+                    assistant_text: simpleReason,
+                    decision: decision,
+                    metadata: metadata,
+                    raw_output: finalResult
+                });
 
                 saveToHistory(data.ticker || 'Unknown', message.substring(0, 40));
 
@@ -943,15 +964,34 @@
             }
         }
 
-        function clearHistory() {
-            if (confirm('Clear all conversation history?')) {
+        async function clearHistory() {
+            if (!confirm('Clear all conversation history? This will delete server-side messages for this user too.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/messages/user/${userId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const result = await response.json();
+                if (!response.ok) {
+                    throw new Error(result?.error || result?.detail || 'Failed to delete server messages');
+                }
+
                 localStorage.removeItem(`egx_history_${currentUser.username}`);
                 loadHistory();
-                addMessage("🗑️ History cleared.", "bot");
+                messagesEl.innerHTML = '';
+                addMessage('✅ Server messages deleted successfully. Conversation history has been cleared.', 'bot');
+                loadPreviousMessages();
+            } catch (err) {
+                addMessage(`❌ Error deleting server messages: ${err.message}`, 'bot');
             }
         }
 
         sendBtn.addEventListener("click", sendMessage);
+        document.getElementById('clearHistoryBtn').addEventListener('click', clearHistory);
         inputEl.addEventListener("keydown", (e) => {
             if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
