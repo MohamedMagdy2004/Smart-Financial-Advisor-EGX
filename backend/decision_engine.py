@@ -61,6 +61,119 @@ def _derive_risk_profile_from_answers(answers: Optional[Dict[str, str]]) -> str:
     return "moderate"
 
 
+HORIZON_ANALYSIS_WEIGHTS = {
+    "short": {"technical_weight": 0.70, "fundamental_weight": 0.30, "analysis_lead": "technicals"},
+    "medium": {"technical_weight": 0.40, "fundamental_weight": 0.60, "analysis_lead": "fundamentals"},
+    "long": {"technical_weight": 0.20, "fundamental_weight": 0.80, "analysis_lead": "fundamentals"},
+}
+
+DRAWDOWN_MIDPOINTS = {
+    "low": 0.05,
+    "medium": 0.15,
+    "high": 0.25,
+}
+
+REBALANCING_FREQUENCY_BY_HORIZON = {
+    "short": "weekly",
+    "medium": "monthly",
+    "long": "quarterly",
+}
+
+QUERY_RESPONSE_RULES = {
+    "SIMPLE_FACT": "Answer in one sentence only. No indicators, no report, no extra commentary.",
+    "QUICK_SUMMARY": "Answer in 3-5 lines maximum. Include price, trend direction, and one key signal only.",
+    "FULL_ANALYSIS": "Return the full structured analysis with fundamentals and technicals, keeping JSON valid.",
+    "COMPARISON": "Return side-by-side key metrics only. No long narrative.",
+    "NEWS_ONLY": "Return bullet points of recent news items only. No technical analysis.",
+}
+
+
+def _normalize_choice(value: Optional[str], default: str) -> str:
+    normalized = str(value or default).strip().lower()
+    return normalized or default
+
+
+def _analysis_weights_for_horizon(horizon: Optional[str]) -> Dict[str, Any]:
+    normalized = _normalize_choice(horizon, "medium")
+    return HORIZON_ANALYSIS_WEIGHTS.get(normalized, HORIZON_ANALYSIS_WEIGHTS["medium"])
+
+
+def _drawdown_midpoint(drawdown: Optional[str]) -> float:
+    normalized = _normalize_choice(drawdown, "medium")
+    return DRAWDOWN_MIDPOINTS.get(normalized, DRAWDOWN_MIDPOINTS["medium"])
+
+
+def _derive_rebalancing_frequency(horizon: Optional[str], trading_style: Optional[str]) -> str:
+    normalized_horizon = _normalize_choice(horizon, "medium")
+    if normalized_horizon in REBALANCING_FREQUENCY_BY_HORIZON:
+        return REBALANCING_FREQUENCY_BY_HORIZON[normalized_horizon]
+
+    normalized_style = _normalize_choice(trading_style, "balanced")
+    if normalized_style == "aggressive":
+        return "weekly"
+    if normalized_style == "defensive":
+        return "quarterly"
+    return "monthly"
+
+
+def _derive_stop_loss(entry_price: Optional[float], drawdown_midpoint: float) -> Optional[float]:
+    if entry_price is None:
+        return None
+    try:
+        return round(float(entry_price) * (1 - drawdown_midpoint), 2)
+    except (TypeError, ValueError):
+        return None
+
+
+def _build_investor_profile_context(
+    user_risk_profile: str,
+    risk_answers: Optional[Dict[str, str]],
+    target_company: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    answers = risk_answers or {}
+    horizon = _normalize_choice(answers.get("investment_horizon"), "medium")
+    drawdown = _normalize_choice(answers.get("max_drawdown_tolerance"), "medium")
+    trading_style = _normalize_choice(answers.get("style"), "balanced")
+    rebalancing = _normalize_choice(answers.get("rebalancing_frequency"), "") or _derive_rebalancing_frequency(horizon, trading_style)
+    weights = _analysis_weights_for_horizon(horizon)
+    drawdown_midpoint = _drawdown_midpoint(drawdown)
+
+    entry_price = None
+    if target_company:
+        entry_price = (target_company.get("price") or {}).get("current_EGP")
+
+    stop_loss = _derive_stop_loss(entry_price, drawdown_midpoint)
+    analysis_focus = "fundamentals" if weights["analysis_lead"] == "fundamentals" else "technicals"
+
+    block_lines = [
+        "---INVESTOR PROFILE---",
+        f"Risk Profile: {user_risk_profile}",
+        f"Investment Horizon: {horizon} → Favor {analysis_focus} analysis",
+        f"Technical Analysis Weight: {weights['technical_weight']:.2f}",
+        f"Fundamental Analysis Weight: {weights['fundamental_weight']:.2f}",
+        f"Drawdown Tolerance: {drawdown} → Stop Loss target: {stop_loss if stop_loss is not None else 'N/A'} EGP",
+        f"Trading Style: {trading_style}",
+        f"Rebalancing Frequency: {rebalancing}",
+        "----------------------",
+    ]
+
+    return {
+        "risk_profile": user_risk_profile,
+        "investment_horizon": horizon,
+        "drawdown_tolerance": drawdown,
+        "trading_style": trading_style,
+        "rebalancing_frequency": rebalancing,
+        "technical_weight": weights["technical_weight"],
+        "fundamental_weight": weights["fundamental_weight"],
+        "analysis_focus": analysis_focus,
+        "analysis_lead": weights["analysis_lead"],
+        "drawdown_midpoint": drawdown_midpoint,
+        "entry_price": entry_price,
+        "stop_loss": stop_loss,
+        "block": "\n".join(block_lines),
+    }
+
+
 def _summarize_news(news_items: List[Dict]) -> Dict[str, Any]:
     counts = {"positive": 0, "negative": 0, "neutral": 0}
     impacts = {"high": 0, "medium": 0, "low": 0}
@@ -172,6 +285,9 @@ def _build_prompt_payload(
     news_data: List[Dict[str, Any]],
     financial_data: Dict[str, Any],
     user_risk_profile: str,
+    risk_context: Dict[str, Any],
+    query_type: str = "FULL_ANALYSIS",
+    query_text: Optional[str] = None,
     max_news_items: int = 8,
     max_text_length: int = 320,
 ) -> Dict[str, Any]:
@@ -190,7 +306,11 @@ def _build_prompt_payload(
 
     return {
         "ticker": ticker.upper(),
+        "query_type": query_type,
+        "query_text": query_text,
+        "response_format_rule": QUERY_RESPONSE_RULES.get(query_type, QUERY_RESPONSE_RULES["FULL_ANALYSIS"]),
         "user_risk_profile": user_risk_profile,
+        "investor_profile": risk_context,
         "news_summary": _summarize_news(company_news),
         "news_items_total": len(company_news),
         "news_items_used": len(compact_news),
@@ -217,25 +337,44 @@ def _build_prompt_payload(
     }
 
 
-def _call_groq(payload: Dict[str, Any]) -> Dict[str, Any]:
-    if not GROQ_API_KEY:
-        raise RuntimeError("Missing GROQ_API_KEY. Set it in environment/.env.")
+def build_groq_prompt(payload: Dict[str, Any]) -> Dict[str, Any]:
+    investor_profile = payload.get("investor_profile", {})
     system_prompt = (
-        "أنت خبير مالي رفيع المستوى ومحلل فني أساسي متخصص في البورصة المصرية (EGX). "
+        "أنت خبير مالي رفيع المستوى ومحلل فني وأساسي متخصص في البورصة المصرية (EGX). "
         "مهمتك ليست مجرد سرد أرقام، بل تقديم رؤية استراتيجية شاملة ومستفيضة. "
-        "يجب أن يجمع تحليلك بين 'نبض السوق' المستمد من الأخبار (Sentiment Analysis) "
-        "وبين 'لغة الأرقام' من المؤشرات الفنية (Technical Indicators). "
-        "تحدث بلهجة مهنية واثقة، فسر العلاقات بين المؤشرات، ولا تختصر الإجابة أبداً."
+        "يجب أن تجمع بين الأخبار والمؤشرات الفنية والبيانات الأساسية، لكنك يجب أن تلتزم بحرفية بقيود نوع السؤال. "
+        "إذا كان الاستثمار متوسط أو طويل الأجل، فابدأ بالأساسيات ولا تضع المؤشرات الفنية في المقدمة."
     )
 
     user_prompt = (
-        f"حلل سهم {payload['ticker']} بعمق. اتبع الآتي:\n\n"
-        "1) في 'stock_analysis': ركز على شرح السعر الحالي مقارنة بالمتوسطات SMA20 و SMA50 ونظرة عامة على الاتجاه.\n"
-        "2) في 'advanced_explanation': ركز **حصرياً** على المستويات الرقمية (فيبوناتشي، دعم، مقاومة) وحجم السيولة. **لا تكرر الكلام المذكور أعلاه**.\n"
-        "3) ممنوع منعاً باتاً كتابة أي أكواد JSON أو علامات ``` داخل القيم النصية. اكتب نصاً عادياً فقط.\n"
-        "4) الرد يجب أن يكون JSON صالح (Valid JSON) فقط، بدون أي مقدمات أو خاتمة خارج الأقواس.\n\n"
+        f"QUERY_TYPE: {payload.get('query_type', 'FULL_ANALYSIS')}\n"
+        f"RESPONSE FORMAT RULE: {payload.get('response_format_rule', QUERY_RESPONSE_RULES['FULL_ANALYSIS'])}\n\n"
+        f"{investor_profile.get('block', '')}\n\n"
+        f"The model MUST use this investor profile block to shape its recommendation. "
+        f"If horizon is medium or long, do NOT lead with technical indicators; lead with fundamentals first.\n\n"
+        f"حلل سهم {payload['ticker']} وفق نوع السؤال التالي: {payload.get('query_text') or 'طلب تحليل استثماري'}\n\n"
+        "1) في stock_analysis: استخدم مزيج المؤشرات مع وزن يتوافق مع أفق الاستثمار.\n"
+        "2) إذا كان الأفق متوسطاً أو طويلاً، ابدأ بالتحليل الأساسي ثم ادعم بالفني.\n"
+        "3) في advanced_explanation: ركز على المستويات الرقمية والدعم والمقاومة وحجم السيولة.\n"
+        "4) ممنوع منعاً باتاً كتابة أي أكواد JSON أو علامات ``` داخل القيم النصية. اكتب نصاً عادياً فقط.\n"
+        "5) الرد يجب أن يكون JSON صالح (Valid JSON) فقط، بدون أي مقدمات أو خاتمة خارج الأقواس.\n\n"
         f"بيانات الدخل: {json.dumps(payload, ensure_ascii=False)}"
     )
+
+    return {
+        "system_prompt": system_prompt,
+        "user_prompt": user_prompt,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+    }
+
+
+def _call_groq(payload: Dict[str, Any]) -> Dict[str, Any]:
+    if not GROQ_API_KEY:
+        raise RuntimeError("Missing GROQ_API_KEY. Set it in environment/.env.")
+    prompt_bundle = build_groq_prompt(payload)
 
     response = requests.post(
         "https://api.groq.com/openai/v1/chat/completions",
@@ -246,10 +385,7 @@ def _call_groq(payload: Dict[str, Any]) -> Dict[str, Any]:
         json={
             "model": GROQ_MODEL,
             "temperature": 0.1,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
+            "messages": prompt_bundle["messages"],
         },
         timeout=120,
     )
@@ -285,6 +421,8 @@ def generate_final_decision(
     financial_json_path: str,
     user_risk_profile: Optional[str] = None,
     risk_answers: Optional[Dict[str, str]] = None,
+    query_type: str = "FULL_ANALYSIS",
+    query_text: Optional[str] = None,
 ) -> Dict[str, Any]:
     ticker = ticker.upper().strip()
 
@@ -299,6 +437,13 @@ def generate_final_decision(
     profile = user_risk_profile or _derive_risk_profile_from_answers(risk_answers)
 
     enriched_financial = enrich_financial_with_mubasher_levels(financial_data)
+    target_company = None
+    for company in enriched_financial.get("companies", []):
+        if company.get("symbol", "").upper() == ticker.upper():
+            target_company = company
+            break
+
+    risk_context = _build_investor_profile_context(profile, risk_answers, target_company)
     llm_result = None
     attempt_sizes = [(8, 320), (5, 220), (3, 160)]
     last_http_error = None
@@ -309,6 +454,9 @@ def generate_final_decision(
             news_data=news_data,
             financial_data=enriched_financial,
             user_risk_profile=profile,
+            risk_context=risk_context,
+            query_type=query_type,
+            query_text=query_text,
             max_news_items=max_items,
             max_text_length=text_len,
         )
@@ -343,12 +491,14 @@ def generate_final_decision(
         "ticker": ticker,
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "user_risk_profile": profile,
+        "query_type": query_type,
         "inputs": {
             "news_json": news_json_path,
             "financial_json": financial_json_path,
             "financial_json_enriched": enriched_financial_path,
         },
         "llm_model": GROQ_MODEL,
+        "prompt_debug": build_groq_prompt(payload),
         "result": llm_result,
     }
 
