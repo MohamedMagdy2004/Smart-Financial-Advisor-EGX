@@ -138,12 +138,13 @@ CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:3000,http://loca
 MODAL_API_TOKEN = os.environ.get("MODAL_API_TOKEN", "")
 
 # Use Modal for inference? (True for remote, False for local)
-USE_MODAL = True
+USE_MODAL = os.environ.get("USE_MODAL", "True").lower() == "true"
 
 # Groq configuration for Part 3 decision engine
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
-
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
+# Alpha Vantage configuration for Part 2 (stock data fallback)
+ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 # ─────────────────────────────────────────────────────────────────────────────
 # FEATURE FLAGS
 # ─────────────────────────────────────────────────────────────────────────────

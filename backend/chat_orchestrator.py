@@ -102,27 +102,48 @@ def _company_name_from_ticker(ticker: str) -> str:
 
 
 def _is_general_chat(user_message: str) -> bool:
-    """نسخة مطورة لتمييز الدردشة العامة عن طلبات البورصة"""
+    """
+    Advanced detection: distinguishes general chat from stock analysis requests.
+    Returns True if it's a greeting, help request, or general inquiry.
+    Returns False only if the user explicitly asks for stock analysis or mentions a ticker.
+    """
     msg = user_message.lower().strip()
-
-    # 1. لو الرسالة فيها كود سهم صريح (4 حروف كابيتال)، دي مش دردشة عامة
+    
     import re
-    if re.search(r'\b[A-Z]{4}\b', user_message.upper()):
+    
+    # 1. Explicit ticker mention (4-letter code in caps) = NOT general chat
+    if re.search(r'\b[A-Z]{4}\b', user_message):
         return False
-
-    # 2. لو فيها كلمات "أكشن" مالية، نعتبرها طلب تحليل فوراً
-    financial_actions = ["حلل", "سهم", "stock", "analyze", "بورصة", "أشتري", "اشتري", "بيع", "سعر"]
+    
+    # 2. Explicit financial action verbs = NOT general chat
+    financial_actions = [
+        "حلل", "سهم", "stock", "analyze", "بورصة", "أشتري", "اشتري", 
+        "بيع", "سعر", "قيمة", "أداء", "توقعات", "اتجاه", "شراء", "بيع",
+        "predict", "forecast", "technical", "fundamental", "buy", "sell"
+    ]
     if any(word in msg for word in financial_actions):
         return False
-
-    # 3. كلمات الترحيب والاستفسار عن الهوية
-    general_keywords = [
+    
+    # 3. GENERAL/HELP KEYWORDS - these ARE general chat
+    help_keywords = [
         "مين", "اسمك", "أهلا", "اهلا", "صباح", "مساء", "ازيك", "أزيك",
-        "hello", "hi", "who are you", "بتعمل ايه", "بتعمل إيه", "وظيفتك"
+        "hello", "hi", "who are you", "بتعمل ايه", "بتعمل إيه", "وظيفتك",
+        "كيف", "كيف يمكن", "كيف تستطيع", "كيفك", "مساعدة", "تساعد",
+        "how can you help", "what can you do", "what do you do", "capabilities",
+        "خدمات", "خدمة", "تقدم", "تقديم", "يمكنك", "يمكنك أن", "يمكنك ما",
+        "ماذا", "ما الذي", "شنو", "شنو اللي", "ليش", "ليه"
     ]
-
-    # لو الرسالة قصيرة جداً أو فيها كلمة ترحيب، نعتبرها دردشة عامة
-    return len(msg.split()) < 3 or any(word in msg for word in general_keywords)
+    
+    # If message contains help/greeting keywords, it IS general chat
+    if any(word in msg for word in help_keywords):
+        return True
+    
+    # 4. Short messages without specific tickers = general chat
+    if len(msg.split()) <= 2:
+        return True
+    
+    # 5. Default: if no explicit financial action, treat as general
+    return True
 
 
 def run_general_chat(user_message: str, chat_history: Optional[list] = None) -> str:
@@ -147,6 +168,7 @@ def run_general_chat(user_message: str, chat_history: Optional[list] = None) -> 
         json={"model": GROQ_MODEL, "messages": messages, "temperature": 0.7},
         timeout=90,
     )
+    response.raise_for_status()  # Raise HTTPError if status code is not 2xx
     return response.json()["choices"][0]["message"]["content"]
 
 
@@ -237,6 +259,9 @@ def run_chat_pipeline(
         filtered_recs = [r for r in recommendations if "detailed analysis" not in r.lower()]
         if filtered_recs:
             detailed_content += "\n".join([f"- {r}" for r in filtered_recs])
+
+    if warning:
+        detailed_content += f"\n\n⚠️ **تحذير المخاطر:**\n{warning}"
 
 
 

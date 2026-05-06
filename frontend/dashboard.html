@@ -895,7 +895,13 @@
                 const decision = finalResult?.decision_translator?.buy_or_not || "HOLD";
                 const simpleReason = finalResult?.decision_translator?.simple_reason || data.chat_reply || "Analysis completed";
 
-                addDecisionMessage(decision, simpleReason);
+                // Display the full chat reply (detailed analysis) instead of just decision + simple reason
+                if (data.chat_reply) {
+                    addMessage(data.chat_reply, "bot");
+                } else {
+                    // Fallback: show decision + simple reason if chat_reply is not available
+                    addDecisionMessage(decision, simpleReason);
+                }
 
                 const metadata = {
                     ticker: data.ticker || 'N/A',
