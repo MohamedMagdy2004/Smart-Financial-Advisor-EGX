@@ -17,7 +17,10 @@ from db import get_db
 from sqlalchemy.orm import Session
 import models
 import services
-from schemas import User, UserCreate, UserUpdate, UserList, LoginRequest, Message , MessageCreate , MessageList
+from schemas import (
+    User, UserCreate, UserUpdate, UserList, LoginRequest, Message, MessageCreate, MessageList,
+    WatchlistCreate, WatchlistResponse, PortfolioHoldingCreate, PortfolioHoldingUpdate, PortfolioHoldingResponse
+)
 
 from config import (
     API_HOST, API_PORT, CORS_ORIGINS, COMPANIES, OUTPUT_SCHEME, DEBUG
@@ -100,6 +103,16 @@ class ChatMessageRequest(BaseModel):
     max_news: Optional[int] = 10
     user_risk_profile: Optional[str] = None
     risk_answers: Optional[dict] = None
+    history: Optional[List[dict]] = []
+
+
+class ChatAliasRequest(BaseModel):
+    message: str
+    risk_profile: Optional[str] = None
+    horizon: Optional[str] = None
+    drawdown: Optional[str] = None
+    style: Optional[str] = None
+    max_news: Optional[int] = 10
     history: Optional[List[dict]] = []
 
 def _resolve_json_path(path_like: str) -> str:
@@ -345,18 +358,115 @@ async def run_decision_engine(payload: DecisionRequest):
 
 @app.post("/chat/message", tags=["Chat"])
 async def chat_message(payload: ChatMessageRequest):
+    """Chat with the AI about EGX stocks"""
+    try:
+        logger.info(f"Chat message received: {payload.message[:50]}...")
+        result = run_chat_pipeline(
+            user_message=payload.message,
+            risk_answers=payload.risk_answers or {},
+            user_risk_profile=payload.user_risk_profile,
+            max_news=payload.max_news or 20,
+            chat_history=payload.history or [],
+        )
+        logger.info(f"Chat pipeline returned: {result.get('status', 'unknown')}")
+        return {"status": "success", **result}
+    except Exception as exc:
+        logger.error(f"Chat pipeline failed: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Chat pipeline failed: {exc}")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# WATCHLIST & PORTFOLIO ENDPOINTS
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/watchlist/{user_id}", response_model=List[WatchlistResponse], tags=["Watchlist"])
+async def get_user_watchlist(user_id: UUID, db: Session = Depends(get_db)):
+    try:
+        return services.get_watchlist(db, user_id)
+    except Exception as exc:
+        logger.error(f"Failed to get watchlist: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get watchlist: {str(exc)}")
+
+@app.post("/watchlist", response_model=WatchlistResponse, tags=["Watchlist"])
+async def add_to_watchlist(data: WatchlistCreate, db: Session = Depends(get_db)):
+    try:
+        return services.add_watchlist_item(db, data)
+    except Exception as exc:
+        logger.error(f"Failed to add watchlist item: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to add watchlist item: {str(exc)}")
+
+@app.delete("/watchlist/{item_id}", tags=["Watchlist"])
+async def remove_from_watchlist(item_id: UUID, db: Session = Depends(get_db)):
+    try:
+        item = services.remove_watchlist_item(db, item_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="Item not found")
+        return {"status": "deleted"}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Failed to remove watchlist item: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to remove watchlist item: {str(exc)}")
+
+@app.get("/portfolio/{user_id}", response_model=List[PortfolioHoldingResponse], tags=["Portfolio"])
+async def get_user_portfolio(user_id: UUID, db: Session = Depends(get_db)):
+    try:
+        return services.get_portfolio(db, user_id)
+    except Exception as exc:
+        logger.error(f"Failed to get portfolio: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to get portfolio: {str(exc)}")
+
+@app.post("/portfolio", response_model=PortfolioHoldingResponse, tags=["Portfolio"])
+async def add_to_portfolio(data: PortfolioHoldingCreate, db: Session = Depends(get_db)):
+    try:
+        return services.add_portfolio_holding(db, data)
+    except Exception as exc:
+        logger.error(f"Failed to add portfolio holding: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to add portfolio holding: {str(exc)}")
+
+@app.patch("/portfolio/{holding_id}", response_model=PortfolioHoldingResponse, tags=["Portfolio"])
+async def update_portfolio(holding_id: UUID, data: PortfolioHoldingUpdate, db: Session = Depends(get_db)):
+    try:
+        holding = services.update_portfolio_holding(db, holding_id, data)
+        if not holding:
+            raise HTTPException(status_code=404, detail="Holding not found")
+        return holding
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Failed to update portfolio: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to update portfolio: {str(exc)}")
+
+@app.delete("/portfolio/{holding_id}", tags=["Portfolio"])
+async def delete_from_portfolio(holding_id: UUID, db: Session = Depends(get_db)):
+    try:
+        holding = services.delete_portfolio_holding(db, holding_id)
+        if not holding:
+            raise HTTPException(status_code=404, detail="Holding not found")
+        return {"status": "deleted"}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Failed to delete portfolio holding: {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to delete portfolio holding: {str(exc)}")
+
+
+@app.post("/chat", tags=["Chat"])
+async def chat_message_alias(payload: ChatAliasRequest):
     """
-    End-to-end chat endpoint:
-    1) infer ticker from user message (LLM)
-    2) run Part 1 news scrape+analyze
-    3) run Part 2 financial generation
-    4) run Part 3 final decision
+    Backward-compatible alias endpoint expected by some clients.
+    Maps flat risk fields into the structured risk_answers consumed by the pipeline.
     """
+    risk_answers = {
+        "investment_horizon": payload.horizon or "medium",
+        "max_drawdown_tolerance": payload.drawdown or "medium",
+        "style": payload.style or "balanced",
+    }
+
     try:
         result = run_chat_pipeline(
             user_message=payload.message,
-            risk_answers=payload.risk_answers,
-            user_risk_profile=payload.user_risk_profile,
+            risk_answers=risk_answers,
+            user_risk_profile=payload.risk_profile,
             max_news=int(payload.max_news or 20),
             chat_history=payload.history,
         )
@@ -531,6 +641,14 @@ async def startup_event():
     logger.info(f"📍 Host: {API_HOST}:{API_PORT}")
     logger.info(f"🌍 CORS Origins: {CORS_ORIGINS}")
     logger.info("=" * 70)
+    
+    # Initialize database tables
+    try:
+        from db import create_tables
+        create_tables()
+        logger.info("✅ Database tables initialized")
+    except Exception as exc:
+        logger.error(f"Failed to initialize database tables: {exc}", exc_info=True)
 
 
 @app.on_event("shutdown")

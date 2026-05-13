@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Test Console</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #1a1a1a;
+            color: #00ff00;
+            padding: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .test {
+            background: #333;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #00ff00;
+        }
+        .test h3 {
+            margin-top: 0;
+            color: #ffff00;
+        }
+        .test button {
+            background: #00ff00;
+            color: #000;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .test button:hover {
+            background: #00cc00;
+        }
+        .output {
+            background: #000;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 3px;
+            max-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .success { color: #00ff00; }
+        .error { color: #ff0000; }
+        .info { color: #00ffff; }
+        .warning { color: #ffaa00; }
+    </style>
+</head>
+<body>
+    <h1>🧪 EGX API Test Console</h1>
+    <p>Test the frontend and backend connectivity</p>
+
+    <div class="test">
+        <h3>1️⃣ Test Health Check</h3>
+        <button onclick="testHealth()">Test /health</button>
+        <div id="health-output" class="output"></div>
+    </div>
+
+    <div class="test">
+        <h3>2️⃣ Test Chat Endpoint</h3>
+        <input type="text" id="chatInput" placeholder="Enter message" value="Tell me about COMI" style="width:300px; padding:5px;">
+        <button onclick="testChat()">Send to /chat/message</button>
+        <div id="chat-output" class="output"></div>
+    </div>
+
+    <div class="test">
+        <h3>3️⃣ Test Watchlist Endpoint</h3>
+        <button onclick="testWatchlist()">Test POST /watchlist</button>
+        <div id="watchlist-output" class="output"></div>
+    </div>
+
+    <div class="test">
+        <h3>4️⃣ Test Frontend Initialization</h3>
+        <button onclick="testFrontendInit()">Check Dashboard Script</button>
+        <div id="frontend-output" class="output"></div>
+    </div>
+
+    <script>
+        const API_BASE = "http://127.0.0.1:8000";
+        const log = (id, message, type = 'info') => {
+            const el = document.getElementById(id);
+            const span = document.createElement('div');
+            span.className = type;
+            span.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            el.appendChild(span);
+            el.scrollTop = el.scrollHeight;
+        };
+
+        async function testHealth() {
+            const id = 'health-output';
+            document.getElementById(id).innerHTML = '';
+            log(id, '🔄 Testing health endpoint...', 'info');
+            try {
+                const res = await fetch(`${API_BASE}/health`);
+                const data = await res.json();
+                log(id, `✅ Status: ${data.status}`, 'success');
+                log(id, `Timestamp: ${data.timestamp}`, 'info');
+            } catch(e) {
+                log(id, `❌ Error: ${e.message}`, 'error');
+            }
+        }
+
+        async function testChat() {
+            const id = 'chat-output';
+            document.getElementById(id).innerHTML = '';
+            const message = document.getElementById('chatInput').value;
+            log(id, `🔄 Sending message: "${message}"...`, 'info');
+            try {
+                const payload = {
+                    message: message,
+                    max_news: 5,
+                    user_risk_profile: 'moderate'
+                };
+                log(id, `📡 Payload: ${JSON.stringify(payload)}`, 'info');
+                log(id, '⏳ Waiting for response (may take 30-60s)...', 'warning');
+                
+                const res = await fetch(`${API_BASE}/chat/message`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                
+                log(id, `📥 Response status: ${res.status} ${res.statusText}`, res.ok ? 'success' : 'error');
+                const data = await res.json();
+                log(id, `Response data: ${JSON.stringify(data).substring(0, 200)}...`, 'info');
+            } catch(e) {
+                log(id, `❌ Error: ${e.message}`, 'error');
+            }
+        }
+
+        async function testWatchlist() {
+            const id = 'watchlist-output';
+            document.getElementById(id).innerHTML = '';
+            log(id, '🔄 Testing watchlist endpoint...', 'info');
+            try {
+                const payload = {
+                    ticker: 'COMI',
+                    user_id: '123e4567-e89b-12d3-a456-426614174000'
+                };
+                log(id, `📡 POST /watchlist with: ${JSON.stringify(payload)}`, 'info');
+                log(id, '⏳ Waiting for response...', 'warning');
+                
+                const res = await fetch(`${API_BASE}/watchlist`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+                
+                log(id, `📥 Response status: ${res.status} ${res.statusText}`, res.ok ? 'success' : 'error');
+                const data = await res.json();
+                log(id, `Response: ${JSON.stringify(data).substring(0, 300)}...`, 'info');
+            } catch(e) {
+                log(id, `❌ Error: ${e.message}`, 'error');
+            }
+        }
+
+        function testFrontendInit() {
+            const id = 'frontend-output';
+            document.getElementById(id).innerHTML = '';
+            log(id, '🔍 Checking frontend code...', 'info');
+            try {
+                // Fetch the dashboard to check for initialization logs
+                fetch('/dashboard.html')
+                    .then(r => r.text())
+                    .then(html => {
+                        const hasDebugLogs = html.includes('console.log');
+                        const hasAPIBase = html.includes('127.0.0.1:8000');
+                        const hasSendMessage = html.includes('function sendMessage()');
+                        const hasTogglePanel = html.includes('function toggleProfilePanel()');
+                        
+                        log(id, `✅ Debug logs present: ${hasDebugLogs}`, hasDebugLogs ? 'success' : 'warning');
+                        log(id, `✅ API_BASE = 127.0.0.1: ${hasAPIBase}`, hasAPIBase ? 'success' : 'error');
+                        log(id, `✅ sendMessage() present: ${hasSendMessage}`, hasSendMessage ? 'success' : 'warning');
+                        log(id, `✅ toggleProfilePanel() present: ${hasTogglePanel}`, hasTogglePanel ? 'success' : 'warning');
+                        
+                        if (hasDebugLogs && hasAPIBase && hasSendMessage && hasTogglePanel) {
+                            log(id, '✅ All checks passed! Dashboard ready for testing.', 'success');
+                        }
+                    });
+            } catch(e) {
+                log(id, `❌ Error checking dashboard: ${e.message}`, 'error');
+            }
+        }
+
+        // Auto-test on load
+        window.addEventListener('load', () => {
+            log('health-output', '✅ Test page loaded', 'success');
+            testHealth();
+            testFrontendInit();
+        });
+    </script>
+</body>
+</html>

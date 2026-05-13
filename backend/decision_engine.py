@@ -151,6 +151,8 @@ def _build_investor_profile_context(
         f"Investment Horizon: {horizon} → Favor {analysis_focus} analysis",
         f"Technical Analysis Weight: {weights['technical_weight']:.2f}",
         f"Fundamental Analysis Weight: {weights['fundamental_weight']:.2f}",
+        f"technical_weight: {weights['technical_weight']:.2f}",
+        f"fundamental_weight: {weights['fundamental_weight']:.2f}",
         f"Drawdown Tolerance: {drawdown} → Stop Loss target: {stop_loss if stop_loss is not None else 'N/A'} EGP",
         f"Trading Style: {trading_style}",
         f"Rebalancing Frequency: {rebalancing}",

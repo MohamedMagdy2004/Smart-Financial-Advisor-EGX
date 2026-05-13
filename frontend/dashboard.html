@@ -4,1018 +4,2316 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EGX - AI Financial Intelligence</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
+        html { font-size: 15px; width:100%; height:100%; overflow-x:hidden; }
+        :root {
+            --bg-0: #06111f;
+            --bg-1: #091624;
+            --bg-2: #101b2f;
+            --surface: rgba(11, 18, 30, 0.88);
+            --surface-2: rgba(16, 24, 38, 0.92);
+            --surface-3: rgba(21, 30, 46, 0.94);
+            --border: rgba(148, 163, 184, 0.12);
+            --border-strong: rgba(103, 132, 176, 0.2);
+            --text: #e6eef7;
+            --muted: #8ea3b8;
+            --accent: #4aa3ff;
+            --accent-2: #7c9cff;
+            --success: #26c281;
+            --danger: #ef6b6b;
+            --warning: #f5b942;
+            --shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.42);
+            --shadow-md: 0 14px 35px rgba(0, 0, 0, 0.28);
+            --radius-lg: 18px;
+            --radius-md: 14px;
+        }
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #0b132b 0%, #1c2541 40%, #280875 100%);
-            color: #fff;
+            font-family: 'Cairo', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(74, 163, 255, 0.10), transparent 30%),
+                radial-gradient(circle at top right, rgba(124, 156, 255, 0.08), transparent 26%),
+                linear-gradient(135deg, var(--bg-0) 0%, var(--bg-1) 44%, var(--bg-2) 100%);
+            color: var(--text);
+            width:100vw;
             min-height: 100vh;
-            overflow-x: hidden;
+            -webkit-font-smoothing:antialiased;
+            line-height: 1.5;
+            overflow-x:hidden;
+            overflow-y:hidden;
+        }
+
+        .neural-bg { position: fixed; width:100%; height:100%; top:0; left:0; z-index:0; opacity:0.15; filter:saturate(0.5); }
+        .grid-bg { position: fixed; width:100%; height:100%; top:0; left:0; z-index:0; background-image: linear-gradient(rgba(148,163,184,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.04) 1px, transparent 1px); background-size:44px 44px; pointer-events:none; opacity:0.7; }
+
+        .app-container { display:flex; gap:16px; width:100vw; min-height:100vh; margin:0; padding:16px; position:relative; z-index:2; align-items:stretch; overflow:hidden; }
+
+        .sidebar { --sidebar-width: 280px; width:var(--sidebar-width); flex:0 0 var(--sidebar-width); min-width:60px; max-width:360px; position:relative; background: linear-gradient(180deg, rgba(12, 19, 31, 0.94), rgba(10, 15, 26, 0.92)); backdrop-filter: blur(16px); border-radius:var(--radius-lg); border:1px solid var(--border); overflow:hidden; box-shadow: var(--shadow-lg); transition: width 240ms ease, transform 240ms ease, opacity 240ms ease, box-shadow 240ms ease, border-color 240ms ease, flex-basis 240ms ease; display:flex; flex-direction:column; }
+        .sidebar.collapsed { width:72px !important; flex-basis:72px !important; }
+        .sidebar.collapsed .sidebar-body,
+        .sidebar.collapsed .sidebar-footer,
+        .sidebar.collapsed .sidebar-title,
+        .sidebar.collapsed .sidebar-profile-card,
+        .sidebar.collapsed .profile-summary,
+        .sidebar.collapsed .profile-actions,
+        .sidebar.collapsed .profile-inputs,
+        .sidebar.collapsed .tabs-nav,
+        .sidebar.collapsed .add-item-form,
+        .sidebar.collapsed .watchlist-container,
+        .sidebar.collapsed #watchlistContainer { display:none !important; }
+        .sidebar.collapsed .sidebar-title-wrap > div:last-child { display:none !important; }
+        .sidebar.collapsed .sidebar-header { justify-content:center; align-items:center; flex-direction:column; padding:12px 8px; gap:8px; }
+        
+        .sidebar-panel { display:flex; flex-direction:column; height:100%; min-height:0; }
+        .sidebar-header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; border-bottom:1px solid rgba(148,163,184,0.08); background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent); flex-shrink:0; }
+        .sidebar-title-wrap { display:flex; align-items:center; gap:10px; min-width:0; }
+        .sidebar-title { font-size:13px; color:#d6e6f7; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:0.2px; }
+        .sidebar-body { flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; padding:16px; display:flex; flex-direction:column; gap:12px; }
+        .sidebar-body::-webkit-scrollbar { width:8px; }
+        .sidebar-body::-webkit-scrollbar-thumb { background:rgba(0,112,200,0.16); border-radius:10px; }
+        .tab-content { display:none; }
+        .tab-content.active { display:block; }
+        .sidebar.collapsed .sidebar-title-wrap { justify-content:center; }
+        
+        .right-sidebar.collapsed { width:72px !important; flex-basis:72px !important; }
+        .right-sidebar.collapsed .history-body,
+        .right-sidebar.collapsed .history-search,
+        .right-sidebar.collapsed .history-list,
+        .right-sidebar.collapsed .history-footer,
+        .right-sidebar.collapsed .history-title-text { display:none !important; }
+        .right-sidebar.collapsed .history-panel-header { justify-content:center; align-items:center; flex-direction:column; padding:12px 8px; gap:8px; }
+        .right-sidebar.collapsed .history-title { justify-content:center; }
+        .right-sidebar.collapsed .history-count { display:none; }
+        .history-resizer { position:absolute; left:0; top:0; bottom:0; width:10px; cursor:ew-resize; z-index:4; }
+        .history-panel { display:flex; flex-direction:column; height:100%; min-height:0; }
+        .history-panel-header { padding:12px 12px 10px 16px; display:flex; align-items:center; justify-content:space-between; gap:10px; border-bottom:1px solid rgba(148,163,184,0.08); background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent); }
+        .history-title { display:flex; align-items:center; gap:10px; min-width:0; }
+        .history-title-text { font-size:13px; color:#d6e6f7; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:0.2px; }
+        .history-header-actions { display:flex; gap:8px; align-items:center; }
+        .icon-btn { width:32px; height:32px; border-radius:10px; border:1px solid rgba(148,163,184,0.14); background:rgba(255,255,255,0.03); color:#dcecff; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; transition: transform 180ms ease, background 180ms ease, border-color 180ms ease, opacity 180ms ease, box-shadow 180ms ease; }
+        .icon-btn:hover { transform: translateY(-1px); background:rgba(74,163,255,0.10); border-color:rgba(74,163,255,0.20); box-shadow:0 10px 20px rgba(0,0,0,0.15); }
+        .history-body { display:flex; flex-direction:column; min-height:0; padding:12px; gap:12px; }
+        .history-search { display:flex; align-items:center; gap:8px; padding:11px 12px; border-radius:14px; background:rgba(6,12,21,0.72); border:1px solid rgba(148,163,184,0.10); transition:border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease; }
+        .history-search:focus-within { border-color:rgba(74,163,255,0.28); box-shadow:0 0 0 3px rgba(74,163,255,0.08); }
+        .history-search input { width:100%; background:transparent; border:0; outline:0; color:#e6f5ff; font-family:inherit; font-size:13px; }
+        .history-search input::placeholder { color:#7f98ab; }
+        .history-list { flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding-right:2px; }
+        .history-list::-webkit-scrollbar { width:8px; }
+        .history-list::-webkit-scrollbar-thumb { background:rgba(0,112,200,0.16); border-radius:10px; }
+        .history-card { position:relative; display:flex; flex-direction:column; gap:8px; padding:13px; border-radius:16px; background:linear-gradient(180deg, rgba(17, 25, 38, 0.94), rgba(12, 18, 29, 0.94)); border:1px solid rgba(148,163,184,0.10); cursor:pointer; overflow:hidden; transform:translateY(0); transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease, opacity 180ms ease; animation:historyCardIn 220ms ease both; }
+        .history-card:hover { transform: translateY(-1px); border-color:rgba(74,163,255,0.20); box-shadow:0 12px 28px rgba(0,0,0,0.22); }
+        .history-card.active { border-color:rgba(74,163,255,0.30); background:linear-gradient(135deg, rgba(74,163,255,0.12), rgba(12,18,29,0.95)); box-shadow:0 14px 30px rgba(74,163,255,0.08); }
+        .history-card-title-row { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+        .history-card-title { font-size:13px; font-weight:700; color:#edf5ff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .history-card-date { font-size:11px; color:#8ea3b8; margin-top:2px; }
+        .history-card-preview { font-size:12px; color:#b7c8d8; line-height:1.5; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+        .history-card-actions { display:flex; justify-content:flex-end; gap:6px; }
+        .history-delete { width:28px; height:28px; border-radius:8px; border:1px solid rgba(239,107,107,0.14); background:rgba(239,107,107,0.08); color:#ffb2b2; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; transition: transform 180ms ease, background 180ms ease, border-color 180ms ease; }
+        .history-delete:hover { transform:scale(1.03); background:rgba(239,107,107,0.14); border-color:rgba(239,107,107,0.24); }
+        .history-footer { padding:12px; border-top:1px solid rgba(148,163,184,0.08); display:flex; gap:8px; align-items:center; }
+        .new-chat-btn { flex:1; padding:10px 12px; border-radius:12px; border:none; background:linear-gradient(135deg,#3e86ff,#6b8cff); color:#fff; cursor:pointer; font-weight:700; box-shadow:0 10px 24px rgba(0,0,0,0.20); transition: transform 180ms ease, opacity 180ms ease, filter 180ms ease; }
+        .new-chat-btn:hover { transform: translateY(-1px); }
+        .history-empty { text-align:center; padding:24px 12px; color:#9fb7c9; font-size:13px; border:1px dashed rgba(148,163,184,0.12); border-radius:12px; background:rgba(255,255,255,0.02); }
+        @keyframes historyCardIn { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: translateY(0); } }
+
+        .main-content { flex: 1.2; display:flex; flex-direction:column; gap:12px; min-width:0; }
+
+        .header { background: linear-gradient(180deg, rgba(13, 20, 32, 0.96), rgba(9, 14, 24, 0.94)); backdrop-filter: blur(14px); border-radius:var(--radius-lg); padding:14px 18px; display:flex; justify-content:space-between; align-items:center; border:1px solid var(--border); box-shadow: var(--shadow-md); }
+
+        /* Chat section */
+        .chat-section { display:flex; flex-direction:column; flex:1; min-height:0; background: linear-gradient(180deg, rgba(11, 18, 30, 0.95), rgba(9, 14, 24, 0.92)); border-radius:var(--radius-lg); border:1px solid var(--border); overflow:hidden; box-shadow: var(--shadow-lg); }
+        .chat-header { padding:14px 18px; border-bottom:1px solid rgba(148,163,184,0.08); display:flex; justify-content:space-between; align-items:center; background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent); }
+
+        .messages { flex:1; overflow-y:auto; overflow-x:hidden; padding:22px; display:flex; flex-direction:column; gap:14px; scroll-behavior:smooth; background:radial-gradient(circle at top, rgba(74,163,255,0.03), transparent 45%); min-width:0; min-height:0; }
+
+        /* Message bubble base */
+        .msg { display:inline-flex; flex-direction:column; max-width:90%; animation:popIn .22s cubic-bezier(.2,.9,.3,1); }
+        .msg.bot { max-width:92%; }
+        .msg .bubble { padding:16px 20px; border-radius:14px; line-height:1.8; font-size:15px; box-shadow:0 8px 22px rgba(0,0,0,0.18); word-wrap:break-word; unicode-bidi:plaintext; -webkit-font-smoothing:antialiased; }
+        @keyframes popIn { from { opacity:0; transform: translateY(6px) scale(.995);} to { opacity:1; transform: translateY(0) scale(1);} }
+
+        .msg.user { align-self:flex-end; align-items:flex-end; }
+        .msg.user .bubble { background: linear-gradient(135deg,#3f83f8,#6d8bff); color:#f8fbff; border-radius:16px 16px 4px 16px; }
+
+        .msg.bot { align-self:flex-start; align-items:flex-start; }
+        .msg.bot .bubble { background: linear-gradient(180deg, rgba(19,26,38,0.98), rgba(13,19,30,0.98)); color:#d9e6f4; border:1px solid rgba(148,163,184,0.12); border-radius:16px 16px 16px 4px; padding:18px 22px; }
+
+        .message-rtl { direction: rtl; text-align: right; font-family: 'Cairo', sans-serif; }
+        .message-ltr { direction: ltr; text-align: left; font-family: 'Inter', sans-serif; }
+
+        .msg.decision .bubble { background: linear-gradient(135deg, rgba(74,163,255,0.08), rgba(99,102,241,0.08)); border:1px solid rgba(148,163,184,0.14); color:#edf5ff; padding: 16px 20px; }
+        .msg.decision .bubble strong { color: var(--accent); }
+
+        /* Investment Brief Format */
+        .investment-brief { display:flex; flex-direction:column; gap:16px; }
+        
+        /* Top Summary Header with Stat Cards */
+        .brief-header { display:flex; flex-wrap:wrap; gap:10px; padding:12px; background:rgba(0,112,200,0.06); border:1px solid rgba(0,112,200,0.12); border-radius:10px; align-items:center; }
+        .brief-stat-card { display:flex; flex-direction:column; gap:2px; padding:8px 12px; background:rgba(6,12,20,0.6); border:1px solid rgba(0,112,200,0.2); border-radius:8px; font-size:12px; line-height:1.3; }
+        .brief-stat-card .stat-label { color:rgba(148,163,184,0.7); font-size:10px; letter-spacing:0.3px; }
+        .brief-stat-card .stat-value { color:var(--accent); font-weight:700; font-size:13px; }
+        .brief-stat-card.recommendation .stat-value { color:#4ade80; }
+        .brief-stat-card.recommendation.sell .stat-value { color:#ff6b6b; }
+        .brief-stat-card.recommendation.hold .stat-value { color:#fbbf24; }
+        .brief-stat-card.positive { border-left:3px solid #4ade80; }
+        .brief-stat-card.negative { border-left:3px solid #ff6b6b; }
+        .brief-stat-card.neutral { border-left:3px solid #fbbf24; }
+        
+        /* Executive Summary */
+        .brief-summary { padding:14px 16px; background:rgba(0,112,200,0.04); border-left:3px solid var(--accent); border-radius:6px; line-height:1.65; font-size:14px; color:#e2f0ff; }
+        
+        /* Analysis Sections */
+        .brief-section { display:flex; flex-direction:column; gap:8px; padding:14px; background:rgba(6,12,20,0.4); border:1px solid rgba(148,163,184,0.08); border-radius:10px; }
+        .brief-section-title { display:flex; align-items:center; gap:8px; font-size:13px; font-weight:700; color:var(--accent); letter-spacing:0.2px; margin-bottom:4px; }
+        .brief-section-title .icon { font-size:14px; }
+        .brief-list { display:flex; flex-direction:column; gap:6px; margin:6px 0; }
+        .brief-list-item { display:flex; gap:8px; align-items:flex-start; font-size:13px; line-height:1.5; color:#d6e6f7; }
+        .brief-list-item .bullet { flex-shrink:0; color:var(--accent); font-weight:700; }
+        .brief-list-item strong { color:#4ade80; }
+        .brief-list-item .negative { color:#ff6b6b; }
+        .brief-list-item .neutral { color:#fbbf24; }
+        
+        /* Highlight numeric values */
+        .brief-value { font-weight:700; color:var(--accent); }
+        .brief-value.positive { color:#4ade80; }
+        .brief-value.negative { color:#ff6b6b; }
+        
+        /* Responsive */
+        @media (max-width:480px) { 
+            .brief-header { flex-direction:column; align-items:flex-start; }
+            .brief-stat-card { flex:1; min-width:140px; }
+            .msg { max-width:100%; }
+        }
+
+        .msg .meta { font-size:12px; color:#8ea3b8; margin-top:6px; background: rgba(0,212,255,0.04); padding: 4px 10px; border-radius: 8px; border: 1px solid rgba(148,163,184,0.08); display:none; }
+        .msg .ts { font-size:11px; color:#7d90a4; margin-top:6px; align-self:flex-end; }
+
+        /* Loader dots */
+        .loader { display:inline-block; width:40px; }
+        .loader span { display:inline-block; width:8px; height:8px; margin-right:6px; background:rgba(255,255,255,0.18); border-radius:50%; animation:ld 1s infinite ease-in-out; }
+        .loader span:nth-child(2){animation-delay:.12s;} .loader span:nth-child(3){animation-delay:.24s;} @keyframes ld{0%{transform:translateY(0);opacity:.3}50%{transform:translateY(-6px);opacity:1}100%{transform:translateY(0);opacity:.3}}
+
+        .composer { padding:14px 16px; border-top:1px solid rgba(148,163,184,0.08); display:flex; gap:10px; background:linear-gradient(180deg, rgba(12,17,26,0.95), rgba(10,14,23,0.96)); position:sticky; bottom:0; z-index:6; align-items:flex-end; flex-shrink:0; }
+        .composer textarea { flex:1; padding:13px 14px; background:rgba(6,12,20,0.76); border:1px solid rgba(148,163,184,0.12); border-radius:14px; color:#edf5ff; font-family:'Cairo',sans-serif; font-size:15px; min-height:48px; max-height:160px; resize:none; overflow-y:auto; box-shadow: inset 0 1px 0 rgba(255,255,255,0.02); }
+        .composer textarea:focus { outline:none; border-color: rgba(74,163,255,0.28); box-shadow:0 0 0 3px rgba(74,163,255,0.06); }
+        .composer button { padding:10px 18px; background:linear-gradient(135deg,#3f83f8,#6d8bff); border:none; border-radius:14px; color:#fff; font-weight:700; cursor:pointer; box-shadow:0 10px 24px rgba(0,0,0,0.20); transition: transform 180ms ease, filter 180ms ease, opacity 180ms ease; }
+        .composer button:hover:not(:disabled) { transform: translateY(-1px); filter:saturate(1.03); }
+        .composer button:disabled { opacity:0.65; cursor:not-allowed; }
+
+        #setProfileBtn,
+        #editProfileBtn,
+        #maxNews,
+        #messageInput,
+        #historySearch {
+            font-family: inherit;
+            border-radius: 14px !important;
+            transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease, transform 180ms ease;
+        }
+
+        #setProfileBtn {
+            background: linear-gradient(135deg, #3f83f8, #6d8bff) !important;
+            color: #fff !important;
+            box-shadow: 0 10px 24px rgba(0, 0, 0, 0.20);
+        }
+
+        #editProfileBtn {
+            background: rgba(255,255,255,0.02) !important;
+            border: 1px solid rgba(148,163,184,0.14) !important;
+            color: #d6e6f7 !important;
+        }
+
+        #setProfileBtn:hover,
+        #editProfileBtn:hover,
+        #maxNews:hover,
+        #messageInput:hover,
+        #historySearch:hover {
+            box-shadow: 0 0 0 3px rgba(74,163,255,0.05);
+        }
+
+        #maxNews,
+        #messageInput,
+        #historySearch {
+            background: rgba(6,12,20,0.76) !important;
+            border: 1px solid rgba(148,163,184,0.12) !important;
+            color: #edf5ff !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+        }
+
+        #maxNews:focus,
+        #messageInput:focus,
+        #historySearch:focus {
+            outline: none;
+            border-color: rgba(74,163,255,0.28) !important;
+            box-shadow: 0 0 0 3px rgba(74,163,255,0.06) !important;
+        }
+
+        #pipelineStatus {
             position: relative;
+            padding-left: 18px;
+            color: #d6e6f7 !important;
+            letter-spacing: 0.2px;
         }
 
-        /* Animated Neural Network Background - Lighter */
-        .neural-bg {
-            position: fixed;
-            width: 100%;
-            height: 100%;
-            top: 0;
-            left: 0;
-            z-index: 0;
-            overflow: hidden;
-        }
-
-        .neuron {
+        #pipelineStatus::before {
+            content: '';
             position: absolute;
-            width: 5px;
-            height: 5px;
-            background: rgba(0, 212, 255, 0.5);
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
-            box-shadow: 0 0 10px rgba(0, 212, 255, 0.6);
-            animation: pulse 3s infinite;
+            background: var(--warning);
+            box-shadow: 0 0 0 4px rgba(245,185,66,0.10);
         }
 
-        @keyframes pulse {
-            0%, 100% { opacity: 0.2; transform: scale(1); }
-            50% { opacity: 0.8; transform: scale(1.3); }
+        #pipelineStatus.online::before {
+            background: var(--success);
+            box-shadow: 0 0 0 4px rgba(38,194,129,0.10);
         }
-        .grid-bg {
+
+        #pipelineStatus.offline::before {
+            background: var(--danger);
+            box-shadow: 0 0 0 4px rgba(239,107,107,0.10);
+        }
+
+        .messages::-webkit-scrollbar{width:8px;} .messages::-webkit-scrollbar-thumb{background:rgba(0,112,200,0.16);border-radius:10px}
+
+        .sidebar-backdrop {
+            position:fixed;
+            inset:0;
+            background:rgba(2,6,23,0.52);
+            backdrop-filter: blur(8px);
+            opacity:0;
+            pointer-events:none;
+            transition: opacity 220ms ease;
+            z-index:25;
+            /* DEBUGGING: Ensure backdrop doesn't interfere when hidden */
+            display: none !important;
+        }
+        body.sidebar-drawer-open .sidebar-backdrop { 
+            opacity:1; 
+            pointer-events:auto;
+            display: block !important;
+        }
+
+        @media (max-width:1100px){ .sidebar{--sidebar-width:200px;} .right-sidebar{--history-width:240px;} }
+        @media (max-width:900px){
+            body { overflow:hidden; }
+            .app-container{flex-direction:column;height:100vh;width:100vw;padding:0;gap:0;overflow:hidden;}
+            .main-content{padding:12px; min-height:100vh; width:100%;}
+            .sidebar,
+            .right-sidebar{
+                position:fixed;
+                top:0;
+                bottom:0;
+                width:min(84vw, 320px) !important;
+                max-width:320px;
+                border-radius:0 18px 18px 0;
+                transform:translateX(-105%);
+                z-index:40;
+                box-shadow: var(--shadow-lg);
+                flex:0 0 auto;
+            }
+            .right-sidebar { right:0; left:auto; border-radius:18px 0 0 18px; transform:translateX(105%); }
+            .sidebar.mobile-open,
+            .right-sidebar.mobile-open { transform:translateX(0); }
+            .sidebar.collapsed,
+            .right-sidebar.collapsed { width:min(84vw, 320px) !important; flex-basis:min(84vw, 320px) !important; }
+            .sidebar.collapsed:not(.mobile-open) { transform:translateX(-105%); }
+            .right-sidebar.collapsed:not(.mobile-open) { transform:translateX(105%); }
+            .history-resizer,.sidebar-resizer{display:none;}
+            .history-body{max-height:320px;}
+        }
+        /* Onboarding modal */
+        .onboard-modal { position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(2,6,23,0.6); z-index:40; }
+        .onboard-card { width:720px; max-width:92%; background:linear-gradient(180deg, rgba(8,12,30,0.98), rgba(6,10,20,0.96)); border-radius:12px; padding:20px; border:1px solid rgba(0,212,255,0.06); box-shadow:0 20px 60px rgba(2,6,23,0.7); color:#dbeeff; }
+        .onboard-steps { display:flex; gap:12px; margin-bottom:14px; }
+        .onboard-step { flex:1; padding:10px; border-radius:8px; background:rgba(255,255,255,0.02); text-align:center; font-size:13px; }
+        .onboard-body { padding:8px 4px 14px; }
+        .onboard-options { display:flex; gap:10px; flex-wrap:wrap; }
+        .onboard-option { padding:10px 12px; border-radius:10px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.03); cursor:pointer; color:#cfe8ff; }
+        .onboard-option.selected { border-color:rgba(3,12,30,0.6); background:linear-gradient(135deg,#06b6d4, #065fcb); color:#041226; font-weight:700; }
+        .onboard-actions { display:flex; justify-content:space-between; gap:10px; margin-top:14px; }
+        .onboard-actions button { padding:10px 14px; border-radius:10px; border:none; cursor:pointer; }
+        .onboard-prev { background:transparent;border:1px solid rgba(255,255,255,0.04); color:#cfe8ff; }
+        .onboard-next { background:linear-gradient(135deg,#06b6d4,#065fcb); color:#fff; }
+
+        /* Floating Sidebar Toggles (Visible when collapsed) */
+        .floating-sidebar-toggle {
             position: fixed;
-            width: 100%;
-            height: 100%;
-            background-image: 
-                linear-gradient(rgba(0, 255, 255, 0.04) 2px, transparent 2px),
-                linear-gradient(90deg, rgba(0, 255, 255, 0.04) 2px, transparent 2px);
-            background-size: 40px 40px;
-            pointer-events: none;
-            z-index: 0;
-        }
-        .app-container {
-            display: flex;
-            height: calc(100vh - 20px);
-            max-width: 1600px;
-            margin: 10px auto;
-            padding: 0 15px;
-            gap: 15px;
-            position: relative;
-            z-index: 2;
-        }
-
-        /* ========== LEFT SIDEBAR ========== */
-        .sidebar {
-            width: 280px;
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            border-radius: 15px;
-            border: 1px solid rgba(0, 255, 255, 0.2);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            box-shadow: 0 0 30px rgba(0, 212, 255, 0.2);
-            transition: all 0.3s;
-        }
-
-        .sidebar:hover {
-            border-color: rgba(0, 212, 255, 0.4);
-            box-shadow: 0 0 50px rgba(0, 212, 255, 0.2);
-        }
-
-        /* User Profile */
-        .user-profile {
-            padding: 20px 15px;
-            border-bottom: 1px solid rgba(0, 255, 255, 0.1);
-            text-align: center;
-        }
-
-        .avatar {
-            width: 60px;
-            height: 60px;
-            background: linear-gradient(135deg, #00d4ff, #0066ff);
-            border-radius: 50%;
+            top: 24px;
+            z-index: 30;
+            width: 44px;
+            height: 44px;
+            background: rgba(12, 19, 31, 0.9);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-strong);
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 26px;
-            margin: 0 auto 10px;
-            box-shadow: 0 0 20px rgba(0, 212, 255, 0.4);
-        }
-
-        .user-name {
-            font-size: 16px;
-            font-weight: bold;
-            background: linear-gradient(135deg, #fff, #00d4ff);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-        }
-
-        .user-email {
-            font-size: 10px;
-            color: #a0aec0;
-        }
-
-        .logout-btn {
-            margin-top: 12px;
-            padding: 8px 16px;
-            background: rgba(255, 68, 68, 0.15);
-            border: 1px solid rgba(255, 68, 68, 0.3);
-            border-radius: 10px;
-            color: #ff8888;
             cursor: pointer;
-            font-size: 12px;
-            transition: all 0.3s;
+            box-shadow: var(--shadow-md);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            color: var(--accent);
+            opacity: 0;
+            pointer-events: none;
+            transform: scale(0.8);
+        }
+
+        .floating-sidebar-toggle:hover {
+            background: var(--bg-2);
+            border-color: var(--accent);
+            box-shadow: 0 0 15px rgba(74, 163, 255, 0.2);
+            transform: scale(1.05);
+        }
+
+        #floatingProfileToggle { left: 24px; }
+        #floatingHistoryToggle { right: 24px; }
+
+        .floating-sidebar-toggle.visible {
+            opacity: 1;
+            pointer-events: auto;
+            transform: scale(1);
+        }
+
+        /* Main Navigation Tabs */
+        .tabs-nav { 
+            display: flex; 
+            background: rgba(6, 12, 20, 0.4); 
+            padding: 4px; 
+            border-radius: 12px; 
+            margin-bottom: 20px;
+            border: 1px solid rgba(148, 163, 184, 0.08);
+        }
+        .tab-btn { 
+            flex: 1; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 8px; 
+            padding: 10px; 
+            border: none; 
+            border-radius: 9px; 
+            background: transparent; 
+            color: #9fb7c9; 
+            font-size: 13px; 
+            font-weight: 600; 
+            cursor: pointer; 
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .tab-btn i { font-size: 14px; opacity: 0.7; }
+        .tab-btn:hover:not(.active) { background: rgba(255, 255, 255, 0.03); color: #fff; }
+        .tab-btn.active { 
+            background: linear-gradient(135deg, rgba(74, 163, 255, 0.2), rgba(74, 163, 255, 0.1)); 
+            color: var(--accent); 
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+            border: 1px solid rgba(74, 163, 255, 0.2);
+        }
+        .tab-btn.active i { opacity: 1; }
+
+        .tab-content { display:none; flex:1; flex-direction:column; min-height:0; animation: fadeIn 0.3s ease; }
+        .tab-content.active { display:flex; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Watchlist Styles */
+        .watchlist-container { display:flex; flex-direction:column; gap:10px; overflow-y:auto; padding-right:4px; margin-bottom: 12px; }
+        .watchlist-item { 
+            display:flex; 
+            align-items:center; 
+            justify-content:space-between; 
+            padding:12px 14px; 
+            background: linear-gradient(145deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+            border:1px solid var(--border); 
+            border-radius:14px; 
+            transition:all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        .watchlist-item:hover { 
+            background:rgba(255,255,255,0.05); 
+            border-color:var(--accent); 
+            transform: translateX(4px);
+            box-shadow: var(--shadow-md);
+        }
+        .watchlist-item::before {
+            content: '';
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            width: 3px;
+            background: var(--accent);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .watchlist-item:hover::before { opacity: 1; }
+
+        .ticker-badge { 
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            color: white; 
+            padding: 4px 10px; 
+            border-radius: 8px; 
+            font-weight: 800; 
+            font-size: 11px;
+            letter-spacing: 0.5px;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+        }
+
+        .recommendation-tag {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+        .tag-buy { background: rgba(38, 194, 129, 0.15); color: var(--success); border: 1px solid rgba(38, 194, 129, 0.2); }
+        .tag-hold { background: rgba(245, 185, 66, 0.15); color: var(--warning); border: 1px solid rgba(245, 185, 66, 0.2); }
+        .tag-sell { background: rgba(239, 107, 107, 0.15); color: var(--danger); border: 1px solid rgba(239, 107, 107, 0.2); }
+        
+        /* Portfolio Styles */
+        .portfolio-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+        .stat-card {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-value { font-size: 14px; font-weight: 700; color: var(--text); }
+        .stat-value.positive { color: var(--success); }
+        .stat-value.negative { color: var(--danger); }
+
+        /* Professional Market Panel Styles */
+        .watchlist-container { display:flex; flex-direction:column; gap:8px; overflow-y:auto; padding-right:4px; margin-bottom: 12px; }
+        .watchlist-item { 
+            display:flex; 
+            align-items:center; 
+            justify-content:space-between; 
+            padding:10px 14px; 
+            background: rgba(255,255,255,0.02);
+            border:1px solid rgba(148,163,184,0.08); 
+            border-radius:12px; 
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .watchlist-item:hover { background: rgba(255,255,255,0.04); border-color: rgba(74, 163, 255, 0.3); transform: translateX(2px); }
+        .watchlist-ticker { font-weight: 700; color: #fff; font-size: 13px; }
+        
+        .portfolio-header { 
+            padding:14px; 
+            background: linear-gradient(135deg, rgba(74,163,255,0.1), rgba(0,0,0,0.25)); 
+            border-radius:16px; 
+            border:1px solid rgba(148,163,184,0.12); 
+            margin-bottom:16px; 
+        }
+        .portfolio-value { font-size:20px; font-weight:800; color:var(--accent); letter-spacing:-0.4px; }
+        
+        .holdings-list { display:flex; flex-direction:column; gap:8px; overflow-y:auto; max-height: 200px; padding-right: 4px; }
+        .holding-card { 
+            padding:10px; 
+            background: rgba(255,255,255,0.02); 
+            border:1px solid rgba(148,163,184,0.08); 
+            border-radius:12px; 
+        }
+        .empty-state { padding: 32px 16px; text-align: center; color: #7d90a4; font-size: 13px; font-style: italic; }
+
+        /* Add Item Form */
+        .add-item-form { 
+            display:flex; 
+            flex-direction: column;
+            gap:12px; 
+            margin-top:12px; 
+            padding: 16px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 12px;
+            border: 1px solid rgba(148,163,184,0.08);
+        }
+        /* Section Title */
+        .add-item-form > div:first-child { 
+            font-size:11px; 
+            color:var(--muted); 
+            font-weight:700; 
+            letter-spacing:0.3px; 
+            text-transform: uppercase;
+        }
+        /* Form Group for Label + Input */
+        .form-group {
+            display:flex;
+            flex-direction:column;
+            gap:6px;
+        }
+        .form-group label {
+            font-size:12px;
+            color:var(--accent);
+            font-weight:600;
+            letter-spacing:0.2px;
+        }
+        /* Input Styling */
+        .add-item-form input { 
             width: 100%;
+            height: 48px;
+            padding: 12px 14px; 
+            background: rgba(6,12,20,0.6); 
+            border: 1px solid rgba(0,112,200,0.15);
+            border-radius: 10px; 
+            color: #fff; 
+            font-size: 13px;
+            font-family: inherit;
+            outline: none;
+            transition: all 0.25s ease;
+            box-sizing: border-box;
+        }
+        .add-item-form input::placeholder {
+            color: rgba(148,163,184,0.45);
+            font-size: 13px;
+        }
+        .add-item-form input:hover {
+            border-color: rgba(0,112,200,0.25);
+            background: rgba(6,12,20,0.75);
+        }
+        .add-item-form input:focus {
+            border-color: var(--accent);
+            background: rgba(6,12,20,0.85);
+            box-shadow: 0 0 0 3px rgba(0,112,200,0.1);
+        }
+        /* Two-Column Row for Qty and Price */
+        .form-row {
+            display:flex;
+            gap:12px;
+        }
+        .form-row .form-group {
+            flex:1;
+        }
+        .form-row input {
+            width:100%;
+        }
+        /* Add Button */
+        .add-item-form button { 
+            width:100%;
+            height:48px; 
+            padding:0;
+            margin-top:4px;
+            background: linear-gradient(135deg, var(--accent), rgba(0,112,200,0.8));
+            border: none;
+            border-radius:10px;
+            color: #fff;
+            font-size:14px;
+            font-weight:700;
+            letter-spacing:0.3px;
+            cursor:pointer;
+            transition: all 0.25s ease;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            gap:6px;
+            flex-shrink:0;
+        }
+        .add-item-form button:hover {
+            background: linear-gradient(135deg, rgba(0,112,200,0.95), var(--accent));
+            box-shadow: 0 8px 16px rgba(0,112,200,0.25);
+            transform: translateY(-2px);
+        }
+        .add-item-form button:active {
+            transform: translateY(0);
         }
 
-        .logout-btn:hover {
-            background: rgba(255, 68, 68, 0.25);
-            border-color: #ff4444;
+        /* Skeleton Loaders */
+        .skeleton { background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.03) 75%); background-size: 200% 100%; animation: skeleton-loading 1.5s infinite; border-radius: 8px; }
+        @keyframes skeleton-loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+        /* Empty States */
+        .empty-state {
+            padding: 30px 20px;
+            text-align: center;
+            background: rgba(0,0,0,0.15);
+            border: 1px dashed var(--border);
+            border-radius: 18px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+        .empty-state .icon { font-size: 32px; margin-bottom: 12px; display: block; filter: grayscale(1); opacity: 0.5; }
+
+        /* Explainability & Insights */
+        .insight-card {
+            background: rgba(16, 24, 38, 0.6);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
+            margin-top: 10px;
+        }
+        .insight-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 8px; 
+            font-size: 11px; 
+            font-weight: 700; 
+            color: var(--accent); 
+            text-transform: uppercase; 
+        }
+        .confidence-bar {
+            height: 6px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--accent-2));
+            transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .reasoning-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 10px;
+            color: var(--muted);
+            margin: 2px;
+        }
+        
+        /* Analysis Result Styling */
+        .analysis-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin: 12px 0;
+        }
+        @media (max-width: 768px) { .analysis-container { grid-template-columns: 1fr; } }
+        
+        .chart-box {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 12px;
+            min-height: 200px;
         }
 
-        /* Risk Settings */
-        .risk-settings {
-            padding: 15px;
-            border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+        .report-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(148,163,184,0.08);
         }
-
-        .settings-title {
+        .btn-report {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 6px 12px;
+            border-radius: 8px;
             font-size: 12px;
-            color: #00d4ff;
-            margin-bottom: 12px;
+            cursor: pointer;
             display: flex;
             align-items: center;
             gap: 6px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .settings-title::before {
-            content: '';
-            width: 3px;
-            height: 12px;
-            background: #00d4ff;
-            border-radius: 2px;
-            box-shadow: 0 0 6px #00d4ff;
-        }
-
-        .setting-group {
-            margin-bottom: 10px;
-        }
-
-        .setting-group label {
-            display: block;
-            font-size: 10px;
-            color:#a0aec0;
-            margin-bottom: 4px;
-        }
-
-        .setting-group select, .setting-group input {
-            width: 100%;
-            padding: 7px 10px;
-            background: rgba(0, 0, 0, 0.5);
-            border: 1px solid rgba(0, 212, 255, 0.3);
-            border-radius: 8px;
-            color: #fff;
-            font-size: 12px;
-            font-family: 'Inter', sans-serif;
-        }
-
-        .setting-group select:focus, .setting-group input:focus {
-            outline: none;
-            border-color: #00d4ff;
-            box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
-        }
-
-        .api-status {
-            margin-top: 12px;
-            padding: 8px;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 8px;
-            font-size: 10px;
-            text-align: center;
-        }
-
-        /* ========== MIDDLE CONTENT (Chat) ========== */
-        .main-content {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            min-width: 0;
-        }
-
-        .header {
-            background: rgba(10, 14, 39, 0.75);
-            backdrop-filter: blur(15px);
-            border-radius: 18px;
-            padding: 10px 20px;
-            border: 1px solid rgba(0, 255, 255, 0.2);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .logo-area {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .logo-img {
-            width: 50px;
-            height: 50px;
-            background: linear-gradient(135deg, #00d4ff, #0066ff);
-            border-radius: 100px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            font-weight: bold;
-            box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
-        }
-
-        .logo-text h1 {
-            font-size: 18px;
-            background: linear-gradient(135deg, #fff, #00d4ff);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-        }
-
-        .logo-text p {
-            font-size: 9px;
-            color: #a0aec0;
-        }
-
-        .pipeline-status {
-            text-align: right;
-        }
-
-        .pipeline-status .label {
-            font-size: 9px;
-            color: #a0aec0;
-        }
-
-        .pipeline-status .value {
-            font-size: 12px;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .status-led {
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            animation: blink 1.5s infinite;
-        }
-
-        @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.3; }
-        }
-
-        .status-led.online {
-            background: #00ff88;
-            box-shadow: 0 0 6px #00ff88;
-        }
-
-        .status-led.offline {
-            background: #ff4444;
-        }
-
-        /* Chat Section */
-        .chat-section {
-            background: rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(15px);
-            border-radius: 20px;
-            border: 1px solid rgba(0, 255, 255, 0.2);
-            display: flex;
-            flex-direction: column;
-            flex: 1;
-            overflow: hidden;
-        }
-        .chat-section:hover {
-            border-color: rgba(0, 212, 255, 0.4);
-            box-shadow: 0 0 40px rgba(0, 212, 255, 0.12);
-        }
-
-        .chat-header {
-            padding: 12px 18px;
-            border-bottom: 1px solid rgba(0, 255, 255, 0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: rgba(0, 0, 0, 0.2);
-        }
-
-        .chat-header h2 {
-            font-size: 14px;
-            color: #00d4ff;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .ai-badge {
-            background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(0, 102, 255, 0.2));
-            padding: 3px 10px;
-            border-radius: 15px;
-            font-size: 9px;
-            border: 1px solid rgba(0, 212, 255, 0.3);
-        }
-
-        .messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            min-height: 350px;
-            max-height: calc(100vh - 200px);
-        }
-
-        .messages::-webkit-scrollbar {
-            width: 4px;
-        }
-
-        .messages::-webkit-scrollbar-track {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 10px;
-        }
-
-        .messages::-webkit-scrollbar-thumb {
-            background: #00d4ff;
-            border-radius: 10px;
-        }
-
-        .msg {
-            max-width: 80%;
-            padding: 8px 14px;
-            border-radius: 16px;
-            line-height: 1.4;
-            word-wrap: break-word;
-            font-size: 13px;
-            animation: fadeIn 0.2s ease;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(5px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .msg.user {
-            align-self: flex-end;
-            background: #1d86e3;
-            padding: 10px;
-            border-radius: 15px 15px 0 15px;
-            color: white;
-        }
-
-        .msg.bot {
-            align-self: flex-start;
-            background: rgba(30, 41, 59, 0.9);
-            border-bottom-left-radius: 4px;
-            border: 1px solid rgba(0, 212, 255, 0.2);
-        }
-
-        .msg.decision {
-            align-self: flex-start;
-            background: linear-gradient(135deg, rgba(0, 212, 255, 0.12), rgba(0, 102, 255, 0.12));
-            border: 1px solid rgba(0, 212, 255, 0.3);
-            border-bottom-left-radius: 4px;
-        }
-
-        .msg.meta {
-            font-size: 10px;
-            color: #a0aec0;
-            background: rgba(0, 0, 0, 0.3);
-            padding: 6px 10px;
-            border-radius: 8px;
-            max-width: 90%;
-            font-family: monospace;
-            border-left: 2px solid #00d4ff;
-        }
-
-        .composer {
-            padding: 12px 18px;
-            border-top: 1px solid rgba(0, 255, 255, 0.1);
-            display: flex;
-            gap: 10px;
-            background: rgba(0, 0, 0, 0.2);
-        }
-
-        .composer textarea {
-            flex: 1;
-            padding: 10px 14px;
-            background: rgba(0, 0, 0, 0.5);
-            border: 1px solid rgba(0, 212, 255, 0.3);
-            border-radius: 12px;
-            color: #fff;
-            font-family: 'Inter', sans-serif;
-            font-size: 13px;
-            resize: none;
-            min-height: 40px;
-            transition: all 0.3s;
-        }
-
-        .composer textarea:focus {
-            outline: none;
-            border-color: #00d4ff;
-            box-shadow: 0 0 12px rgba(0, 212, 255, 0.2);
-        }
-
-        .composer button {
-            padding: 0 22px;
-            background: linear-gradient(135deg, #00d4ff, #0066ff);
-            border: none;
-            border-radius: 12px;
-            color: #fff;
-            font-weight: bold;
-            font-size: 13px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .composer button:hover:not(:disabled) {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
-        }
-
-        .composer button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        /* ========== RIGHT SIDEBAR ========== */
-        .right-sidebar {
-            width: 260px;
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            border-radius: 15px;
-            border: 1px solid rgba(0, 255, 255, 0.2);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            box-shadow: 0 0 30px rgba(0, 212, 255, 0.2);
-            transition: all 0.3s;
-        }
-        .right-sidebar:hover {
-            border-color: rgba(0, 212, 255, 0.4);
-            box-shadow: 0 0 50px rgba(0, 212, 255, 0.2);
-        }
-        .history-header {
-            padding: 15px;
-            border-bottom: 1px solid rgba(0, 255, 255, 0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .history-header h3 {
-            font-size: 12px;
-            color: #00d4ff;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .history-stats {
-            background: rgba(0, 212, 255, 0.15);
-            padding: 3px 8px;
-            border-radius: 15px;
-            font-size: 9px;
-        }
-
-        .chat-history-list {
-            flex: 1;
-            overflow-y: auto;
-            padding: 12px;
-        }
-
-        .history-item {
-            background: rgba(0, 212, 255, 0.05);
-            border-radius: 10px;
-            padding: 10px;
-            margin-bottom: 8px;
-            cursor: pointer;
             transition: all 0.2s;
-            border: 1px solid rgba(0, 212, 255, 0.1);
         }
+        .btn-report:hover { background: var(--surface-3); border-color: var(--accent); }
 
-        .history-item:hover {
-            background: rgba(0, 212, 255, 0.12);
-            border-color: rgba(0, 212, 255, 0.3);
-            transform: translateX(-3px);
-        }
-
-        .history-company {
-            font-size: 12px;
-            font-weight: 600;
-            margin-bottom: 4px;
-            color: #00d4ff;
-        }
-
-        .history-date {
-            font-size: 8px;
-            color: #a0aec0;
-            margin-bottom: 4px;
-        }
-
-        .history-preview {
-            font-size: 9px;
-            color: #cbd5e0;
-            line-height: 1.3;
-        }
-
-        .clear-history {
-            padding: 12px;
-            border-top: 1px solid rgba(0, 255, 255, 0.1);
-        }
-
-        .clear-btn {
-            width: 100%;
-            padding: 8px;
-            background: rgba(255, 68, 68, 0.1);
-            border: 1px solid rgba(255, 68, 68, 0.3);
-            border-radius: 10px;
-            color: #ff8888;
-            cursor: pointer;
-            font-size: 11px;
-            transition: all 0.3s;
-        }
-
-        .clear-btn:hover {
-            background: rgba(255, 68, 68, 0.2);
-        }
-
-        .delete-btn {
-            margin-top: 10px;
-        }
-
-        .footer {
-            text-align: center;
-            padding: 8px;
-            font-size: 9px;
-            color: #a0aec0;
-        }
-
-        @media (max-width: 1100px) {
-            .sidebar, .right-sidebar {
-                width: 240px;
-            }
-        }
-
+        /* Responsive adjustments for toggles */
         @media (max-width: 900px) {
-            .app-container {
-                flex-direction: column;
-                height: auto;
+            .floating-sidebar-toggle {
+                top: auto;
+                bottom: 24px;
+                width: 50px;
+                height: 50px;
+                border-radius: 50%;
+                opacity: 0.9;
+                pointer-events: auto;
+                transform: scale(1);
             }
-            .sidebar, .right-sidebar {
-                width: 100%;
-                max-height: 280px;
-            }
+            #floatingProfileToggle { left: 16px; }
+            #floatingHistoryToggle { right: 16px; }
+            /* Hide when drawer is actually open to avoid overlap */
+            body.sidebar-drawer-open .floating-sidebar-toggle { opacity: 0; pointer-events: none; }
         }
     </style>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="neural-bg" id="neuralBg"></div>
     <div class="grid-bg"></div>
-    <div class="app-container">
-        <!-- LEFT SIDEBAR -->
-        <div class="sidebar">
-            <div class="user-profile">
-                <div class="avatar">👤</div>
-                <div class="user-name" id="userName">Loading...</div>
-                <div class="user-email" id="userEmail">Loading...</div>
-                <button class="logout-btn" id="logoutBtn">Logout</button>
-            </div>
+    <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
 
-            <div class="risk-settings">
-                <div class="settings-title">
-                    ⚙️ Risk Engine
+    <!-- Floating Toggles for collapsed states -->
+    <button id="floatingProfileToggle" class="floating-sidebar-toggle" title="Show Profile Panel">👤</button>
+    <button id="floatingHistoryToggle" class="floating-sidebar-toggle" title="Show History Panel">📜</button>
+
+    <div class="app-container">
+        <div class="sidebar" id="profilePanel" aria-label="Investor profile panel">
+            <div class="sidebar-resizer" id="profileResizer" aria-hidden="true"></div>
+            <div class="sidebar-panel">
+                <div class="sidebar-header">
+                    <div class="sidebar-title-wrap">
+                        <button id="toggleProfileBtn" class="icon-btn" type="button" aria-label="Collapse investor profile">☰</button>
+                        <div>
+                            <div class="sidebar-title">Investor Profile</div>
+                            <div style="font-size:11px;color:#8ba2b6;margin-top:2px;">Risk preferences</div>
+                        </div>
+                    </div>
+                    <button id="logoutBtn" class="icon-btn" type="button" aria-label="Logout">⎋</button>
                 </div>
-                <div class="setting-group">
-                    <label>Risk Profile</label>
-                    <select id="riskProfile">
-                        <option value="">Auto (AI)</option>
-                        <option value="conservative">Conservative</option>
-                        <option value="moderate" selected>Moderate</option>
-                        <option value="aggressive">Aggressive</option>
-                    </select>
-                </div>
-                <div class="setting-group">
-                    <label>Investment Horizon</label>
-                    <select id="horizon">
-                        <option value="short">Short (0-1y)</option>
-                        <option value="medium" selected>Medium (1-3y)</option>
-                        <option value="long">Long (3+y)</option>
-                    </select>
-                </div>
-                <div class="setting-group">
-                    <label>Drawdown Tolerance</label>
-                    <select id="drawdown">
-                        <option value="low">Low (0-10%)</option>
-                        <option value="medium" selected>Medium (10-20%)</option>
-                        <option value="high">High (20-30%)</option>
-                    </select>
-                </div>
-                <div class="setting-group">
-                    <label>Trading Style</label>
-                    <select id="style">
-                        <option value="defensive">Defensive</option>
-                        <option value="balanced" selected>Balanced</option>
-                        <option value="aggressive">Aggressive</option>
-                    </select>
-                </div>
-                <div class="setting-group">
-                    <label>Max News</label>
-                    <input id="maxNews" type="number" min="3" max="50" value="20">
-                </div>
-                <div class="api-status">
-                    🔌 API: <span id="apiStatus">Checking...</span>
+                <div class="sidebar-body">
+                    <div class="tabs-nav">
+                        <button class="tab-btn active" onclick="switchSidebarTab('profile')">
+                            <i>👤</i> Profile
+                        </button>
+                        <button class="tab-btn" onclick="switchSidebarTab('market')">
+                            <i>📈</i> Market
+                        </button>
+                    </div>
+
+                    <div id="profileTab" class="tab-content active">
+                        <div style="text-align:center; margin-bottom: 20px;">
+                            <div style="width:56px;height:56px;border-radius:50%;margin:0 auto;background:linear-gradient(135deg,#00d4ff,#0066ff);display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(3,12,30,0.4);">👤</div>
+                            <div id="userName" class="profile-summary" style="margin-top:8px;font-weight:700;color:transparent;background:linear-gradient(135deg,#fff,#00d4ff);-webkit-background-clip:text;">Loading...</div>
+                            <div id="userEmail" class="profile-summary" style="font-size:12px;color:#9fb7c9;margin-top:4px;">Loading...</div>
+                        </div>
+
+                        <div id="profileCard" class="sidebar-profile-card">
+                            <div id="profileSummary" class="profile-summary">No investor profile set.</div>
+                            <div class="profile-actions">
+                                <button id="setProfileBtn" style="flex:1;padding:8px;border-radius:8px;border:none;background:linear-gradient(135deg,#06b6d4,#065fcb);color:white;cursor:pointer;">Set Profile</button>
+                                <button id="editProfileBtn" style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(0,212,255,0.06);background:transparent;color:#cfe8ff;cursor:pointer;display:none;">Edit</button>
+                            </div>
+                        </div>
+
+                        <div class="profile-inputs" style="margin-top: 16px;">
+                            <label class="sidebar-label">Max News Analysis</label>
+                            <input id="maxNews" type="number" min="3" max="50" value="20" style="width:100%;padding:8px;border-radius:8px;background:rgba(0,0,0,0.45);border:1px solid rgba(0,112,200,0.08);color:#e6f5ff;" />
+                        </div>
+                    </div>
+
+                    <div id="marketTab" class="tab-content">
+                        <div style="font-size:11px; font-weight:700; color:var(--accent); margin: 4px 0 10px; text-transform:uppercase; letter-spacing:1px; display:flex; align-items:center; gap:6px;">
+                            <span style="display:inline-block; width:6px; height:6px; background:var(--accent); border-radius:1px;"></span>
+                            Watchlist
+                        </div>
+                        <div class="watchlist-container" id="watchlistContainer">
+                            <!-- Watchlist items loaded here -->
+                        </div>
+                        <div class="add-item-form">
+                            <input type="text" id="watchlistInput" placeholder="Stock Ticker (e.g. COMI)">
+                            <button onclick="addToWatchlist()" class="icon-btn" title="Add to watchlist">✚</button>
+                        </div>
+
+                        <div style="font-size:11px; font-weight:700; color:var(--accent); margin:24px 0 10px; text-transform:uppercase; letter-spacing:1px; display:flex; align-items:center; gap:6px;">
+                            <span style="display:inline-block; width:6px; height:6px; background:var(--accent); border-radius:1px;"></span>
+                            Portfolio Dashboard
+                        </div>
+                        <div id="portfolioSummaryView">
+                            <div class="portfolio-header">
+                                <div style="font-size:11px; color:#9fb7c9; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Total Investment Value</div>
+                                <div id="totalInvested" class="portfolio-value">EGP 0.00</div>
+                                <div style="display:flex; gap:8px; margin-top:12px;">
+                                    <div class="stat-card" style="flex:1;">
+                                        <span class="stat-label">Holdings</span>
+                                        <span id="holdingsCount" class="stat-value">0</span>
+                                    </div>
+                                    <div class="stat-card" style="flex:1;">
+                                        <span class="stat-label">Market Pulse</span>
+                                        <span id="portfolioSentiment" class="stat-value">Neutral</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="holdings-list" id="holdingsList">
+                                <!-- Holdings loaded here -->
+                            </div>
+                            <div style="margin-top: 12px; display: flex; gap: 8px;">
+                                <button onclick="setupDemoData()" class="btn-report" style="flex: 1; justify-content: center; background: rgba(74, 163, 255, 0.1); border-color: rgba(74, 163, 255, 0.2);">
+                                    <span>🪄</span> Load Demo Presets
+                                </button>
+                            </div>
+                            <div class="add-item-form">
+                                <div>ADD NEW HOLDING</div>
+                                <div class="form-group">
+                                    <label>Ticker Symbol</label>
+                                    <input type="text" id="holdingTicker" placeholder="e.g. COMI, EAST, ABUK">
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Qty</label>
+                                        <input type="number" id="holdingQty" placeholder="100" min="0" step="1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Avg Price (EGP)</label>
+                                        <input type="number" id="holdingPrice" placeholder="150.00" min="0" step="0.01">
+                                    </div>
+                                </div>
+                                <button onclick="addToPortfolio()">✚ Add Holding</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- MIDDLE CONTENT (Chat) -->
         <div class="main-content">
             <div class="header">
-                <div class="logo-area">
-                    <div class="logo-img">
-                    <img src="Chat bot logo.jpg" alt="EGX AI Bot" style="width: 100%; height: 100%; object-fit: cover; border-radius: 100px;">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <div style="width:48px;height:48px;border-radius:100px;background:linear-gradient(135deg,#00d4ff,#0066ff);display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(3,12,30,0.4);">
+                        <img src="Chat bot logo.jpg" alt="EGX AI Bot" style="width:36px;height:36px;border-radius:100%;object-fit:cover;" />
                     </div>
-                    <div class="logo-text">
-                        <h1>EGX AI FINANCIAL BOT</h1>
-                        <p>Egyptian Stock Exchange Intelligence</p>
+                    <div>
+                        <div style="font-weight:700; font-size:18px; background:linear-gradient(135deg,#fff,#00d4ff); -webkit-background-clip:text; color:transparent;">EGX AI FINANCIAL BOT</div>
+                        <div style="font-size:12px;color:#9fb7c9;">Egyptian Stock Exchange Intelligence</div>
                     </div>
                 </div>
-                <div class="pipeline-status">
-                    <div class="label">Pipeline Status</div>
-                    <div class="value">
-                        <span class="status-led online" id="statusLed"></span>
-                        <span id="pipelineStatus">Active</span>
-                    </div>
+                <div style="text-align:right;">
+                    <div style="font-size:12px;color:#9fb7c9;">Pipeline Status</div>
+                    <div id="pipelineStatus" style="font-weight:700;color:#aee6bf;display:flex;align-items:center;gap:8px;justify-content:flex-end;"></div>
                 </div>
             </div>
 
             <div class="chat-section">
                 <div class="chat-header">
-                    <h2>
-                        💬 AI Chat Interface
-                        <span class="ai-badge">Qwen2.5-1.5B</span>
-                    </h2>
+                    <div style="display:flex;align-items:center;gap:10px;font-weight:700;color:#00d4ff;">💬 AI Chat Interface <span style="font-size:11px;padding:4px 8px;border-radius:12px;background:rgba(0,212,255,0.06);border:1px solid rgba(0,212,255,0.06);font-weight:600;color:#cfe8ff;margin-left:8px;">Qwen2.5-1.5B</span></div>
+                    <div style="font-size:12px;color:#9fb7c9;">Model: on-prem</div>
                 </div>
+
                 <div class="messages" id="messages">
-                    <div class="msg bot">
-                        🤖 <strong>EGX AI Bot Online</strong><br><br>
-                        Ask me about Egyptian stocks:<br>
-                        • "Analyze COMI"<br>
-                        • "Should I buy Elsewedy?"<br>
-                        • "Sentiment for TMG"
-                    </div>
+                    <!-- initial messages filled by JS -->
                 </div>
+
                 <div class="composer">
-                    <textarea id="messageInput" placeholder="Type your question..." rows="1"></textarea>
-                    <button id="sendBtn">Send</button>
+                    <textarea id="messageInput" placeholder="Ask about an EGX stock (e.g., COMI analysis)..." rows="1"></textarea>
+                    <button id="sendBtn" title="Send Message">Send</button>
                 </div>
             </div>
 
-            <div class="footer">
-                EGX AI | News Extraction → Financial Analysis → Decision
-            </div>
+            <div style="text-align:center;color:#9fb7c9;font-size:12px;padding-top:6px;">EGX AI | News Extraction → Financial Analysis → Decision</div>
         </div>
 
-        <!-- RIGHT SIDEBAR (Chat History) -->
-        <div class="right-sidebar">
-            <div class="history-header">
-                <h3>📜 Conversation History</h3>
-                <div class="history-stats" id="historyCount">0</div>
-            </div>
-            <div class="chat-history-list" id="historyList">
-                <div style="text-align: center; padding: 30px 15px; color: #a0aec0; font-size: 11px;">
-                    No conversations yet.
+        <div class="right-sidebar" id="historyPanel" aria-label="Conversation History panel">
+            <div class="history-resizer" id="historyResizer" aria-hidden="true"></div>
+            <div class="history-panel">
+                <div class="history-panel-header">
+                    <div class="history-title">
+                        <button id="toggleHistoryBtn" class="icon-btn" type="button" aria-label="Collapse conversation history">☰</button>
+                        <div>
+                            <div class="history-title-text">Conversation History</div>
+                            <div style="font-size:11px;color:#8ba2b6;margin-top:2px;">Saved conversations</div>
+                        </div>
+                    </div>
+                    <div class="history-header-actions">
+                        <div id="historyCount" style="background:rgba(0,212,255,0.06);padding:4px 8px;border-radius:12px;font-size:12px;color:#cfe8ff;">0</div>
+                    </div>
+                </div>
+
+                <div class="history-body">
+                    <div class="history-search">
+                        <span style="color:#7f98ab;">⌕</span>
+                        <input id="historySearch" type="text" placeholder="Search conversations..." aria-label="Search conversations" />
+                    </div>
+                    <div class="history-list" id="historyList">
+                        <div class="history-empty">No conversations yet.</div>
+                    </div>
+                </div>
+
+                <div class="history-footer">
+                    <button class="new-chat-btn" id="newChatBtn" type="button">New Chat</button>
+                    <button id="clearHistoryBtn" class="icon-btn" type="button" aria-label="Clear conversation history">🗑</button>
                 </div>
             </div>
-            <div class="clear-history">
-                <button class="clear-btn" id="clearHistoryBtn">🗑️ Clear History</button>
+        </div>
+    </div>
+
+    <!-- Onboarding modal -->
+    <div class="onboard-modal" id="onboardModal" aria-hidden="true">
+        <div class="onboard-card" role="dialog" aria-modal="true" aria-labelledby="onboardTitle">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                <div id="onboardTitle" style="font-weight:700;font-size:18px;color:#00d4ff;">Investor Onboarding</div>
+                <div><button id="closeOnboardBtn" style="background:transparent;border:0;color:#9fb7c9;cursor:pointer;font-size:18px;">✕</button></div>
+            </div>
+
+            <div class="onboard-steps">
+                <div class="onboard-step" data-step="0">1. Experience</div>
+                <div class="onboard-step" data-step="1">2. Horizon</div>
+                <div class="onboard-step" data-step="2">3. Drawdown</div>
+                <div class="onboard-step" data-step="3">4. Style</div>
+            </div>
+
+            <div class="onboard-body" id="onboardBody">
+                <!-- dynamic step content -->
+            </div>
+
+            <div class="onboard-actions">
+                <button class="onboard-prev" id="onboardPrev">Back</button>
+                <div style="margin-left:auto;display:flex;gap:8px;"><button class="onboard-next" id="onboardNext">Next</button></div>
             </div>
         </div>
     </div>
 
     <script>
-        // Neural Network Background
-        function createNeuralNetwork() {
-            const container = document.getElementById('neuralBg');
-            for (let i = 0; i < 40; i++) {
-                const neuron = document.createElement('div');
-                neuron.className = 'neuron';
-                neuron.style.left = Math.random() * 100 + '%';
-                neuron.style.top = Math.random() * 100 + '%';
-                neuron.style.animationDelay = Math.random() * 3 + 's';
-                neuron.style.animationDuration = 2 + Math.random() * 2 + 's';
-                container.appendChild(neuron);
+        // ===== INITIALIZATION START =====
+        console.log("=== DASHBOARD SCRIPT STARTED ===");
+        
+        // background neurons
+        try {
+            function createNeuralNetwork(){ const container=document.getElementById('neuralBg'); for(let i=0;i<40;i++){ const n=document.createElement('div'); n.className='neuron'; n.style.left=Math.random()*100+'%'; n.style.top=Math.random()*100+'%'; n.style.width='6px'; n.style.height='6px'; n.style.position='absolute'; n.style.borderRadius='50%'; n.style.background='rgba(0,212,255,0.16)'; n.style.boxShadow='0 0 8px rgba(0,212,255,0.12)'; n.style.animationDelay=Math.random()*3+'s'; container.appendChild(n); } }
+            createNeuralNetwork();
+            console.log("✅ Neural network created");
+        } catch(e) {
+            console.warn("⚠️ Neural network setup failed:", e);
+        }
+
+        const API_BASE = "http://127.0.0.1:8000";
+        console.log("✅ API_BASE set to:", API_BASE);
+        
+        // Get DOM elements
+        console.log("🔍 Getting DOM elements...");
+        const messagesEl = document.getElementById('messages');
+        const sendBtn = document.getElementById('sendBtn');
+        const inputEl = document.getElementById('messageInput');
+        const historyPanel = document.getElementById('historyPanel');
+        const historyListEl = document.getElementById('historyList');
+        const historySearchEl = document.getElementById('historySearch');
+        const historyCountEl = document.getElementById('historyCount');
+        const historyResizer = document.getElementById('historyResizer');
+        const toggleHistoryBtn = document.getElementById('toggleHistoryBtn');
+        const newChatBtn = document.getElementById('newChatBtn');
+        const profilePanel = document.getElementById('profilePanel');
+        const profileResizer = document.getElementById('profileResizer');
+        const toggleProfileBtn = document.getElementById('toggleProfileBtn');
+        const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+        const floatingProfileToggle = document.getElementById('floatingProfileToggle');
+        const floatingHistoryToggle = document.getElementById('floatingHistoryToggle');
+        
+        // CRITICAL: Log all DOM elements
+        const domCheck = {
+            messagesEl: !!messagesEl,
+            sendBtn: !!sendBtn,
+            inputEl: !!inputEl,
+            profilePanel: !!profilePanel,
+            historyPanel: !!historyPanel,
+            toggleProfileBtn: !!toggleProfileBtn,
+            toggleHistoryBtn: !!toggleHistoryBtn
+        };
+        console.log("✅ DOM elements status:", domCheck);
+        
+        // If ANY element is null, STOP and report
+        const missingElements = Object.entries(domCheck).filter(([k,v]) => !v).map(([k]) => k);
+        if (missingElements.length > 0) {
+            console.error("❌ CRITICAL: Missing DOM elements:", missingElements);
+            throw new Error("Missing DOM elements: " + missingElements.join(", "));
+        }
+        console.log("✅ All critical DOM elements found");
+
+        // Declare at module scope so they're accessible throughout the script
+        let currentUser = null;
+        let userId = 'demo-user';
+
+        try {
+            currentUser = JSON.parse(localStorage.getItem('egx_current_user')||'null');
+            if(!currentUser||!currentUser.id) { window.location.href='index.html'; }
+            userId = currentUser.id;
+            document.getElementById('userName').textContent = currentUser.username || currentUser.full_name || currentUser.email;
+            document.getElementById('userEmail').textContent = currentUser.email || '';
+            console.log("✅ User loaded:", userId);
+        } catch(e) {
+            console.error("❌ User initialization failed:", e);
+        }
+
+        if (document.getElementById('logoutBtn')) {
+            document.getElementById('logoutBtn').addEventListener('click', ()=>{ localStorage.removeItem('egx_current_user'); window.location.href='index.html'; });
+        }
+
+        function formatTime(d){ try{ return new Date(d||Date.now()).toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'}); }catch(e){ return ''; } }
+
+        function isArabic(text) {
+            const arabicPattern = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+            return arabicPattern.test(text);
+        }
+
+        function formatInvestmentBrief(text) {
+            // Detect if response contains financial analysis indicators
+            const hasAnalysis = /Technical|Sentiment|Risk|Recommendation|BUY|SELL|HOLD|RSI|SMA|Support|Resistance/i.test(text);
+            if (!hasAnalysis) return null;
+
+            // Extract sections (case-insensitive)
+            const sections = {};
+            const sectionRegex = /###\s*(.*?)\n([\s\S]*?)(?=###|$)/gi;
+            let match;
+            while ((match = sectionRegex.exec(text)) !== null) {
+                sections[match[1].trim()] = match[2].trim();
+            }
+
+            if (Object.keys(sections).length === 0) return null;
+
+            // Create brief HTML
+            let html = '<div class="investment-brief">';
+
+            // Parse header info if available
+            const hasTickerInfo = text.match(/Ticker:\s*(\w+)|(\w{2,4})\s*(?:\||—|–)/);
+            const hasRecommendation = /BUY|SELL|HOLD/.test(text);
+            
+            if (hasTickerInfo || hasRecommendation) {
+                html += '<div class="brief-header">';
+                
+                if (hasTickerInfo) {
+                    const ticker = hasTickerInfo[1] || hasTickerInfo[2];
+                    html += `<div class="brief-stat-card"><div class="stat-label">TICKER</div><div class="stat-value">${ticker}</div></div>`;
+                }
+                
+                // Extract recommendation
+                const recMatch = text.match(/(?:Recommendation|Decision):\s*(BUY|SELL|HOLD)/i);
+                if (recMatch || hasRecommendation) {
+                    const rec = recMatch ? recMatch[1] : (text.includes('BUY') ? 'BUY' : text.includes('SELL') ? 'SELL' : 'HOLD');
+                    const recClass = rec === 'BUY' ? 'recommendation' : rec === 'SELL' ? 'recommendation sell' : 'recommendation hold';
+                    html += `<div class="brief-stat-card ${recClass}"><div class="stat-label">RECOMMENDATION</div><div class="stat-value">${rec}</div></div>`;
+                }
+                
+                // Extract confidence
+                const confMatch = text.match(/Confidence:\s*(\d+)%/i);
+                if (confMatch) {
+                    html += `<div class="brief-stat-card"><div class="stat-label">CONFIDENCE</div><div class="stat-value">${confMatch[1]}%</div></div>`;
+                }
+                
+                // Extract sentiment
+                const sentMatch = text.match(/Sentiment:\s*(Positive|Negative|Neutral)/i);
+                if (sentMatch) {
+                    const sentiment = sentMatch[1];
+                    const sentClass = sentiment === 'Positive' ? 'positive' : sentiment === 'Negative' ? 'negative' : 'neutral';
+                    html += `<div class="brief-stat-card ${sentClass}"><div class="stat-label">SENTIMENT</div><div class="stat-value">${sentiment}</div></div>`;
+                }
+                
+                // Extract risk
+                const riskMatch = text.match(/Risk:\s*(Low|Medium|High)/i);
+                if (riskMatch) {
+                    const risk = riskMatch[1];
+                    const riskClass = risk === 'High' ? 'negative' : risk === 'Low' ? 'positive' : 'neutral';
+                    html += `<div class="brief-stat-card ${riskClass}"><div class="stat-label">RISK</div><div class="stat-value">${risk}</div></div>`;
+                }
+                
+                html += '</div>';
+            }
+
+            // Add summary section (first 2-3 lines of content)
+            const summaryMatch = text.match(/^(.*?(?:\n.*?){0,2})\n\n/);
+            if (summaryMatch) {
+                const summary = summaryMatch[1].replace(/###\s*/g, '').trim();
+                html += `<div class="brief-summary">${summary.replace(/\n/g, '<br>')}</div>`;
+            }
+
+            // Add formatted sections
+            const sectionOrder = ['Technical Analysis', 'News Sentiment', 'Risk Assessment', 'Final Recommendation', 'Recommendation'];
+            for (const sectionTitle of sectionOrder) {
+                for (const [key, content] of Object.entries(sections)) {
+                    if (key.toLowerCase().includes(sectionTitle.toLowerCase())) {
+                        const icons = {
+                            'technical': '📈',
+                            'news': '📰',
+                            'sentiment': '📰',
+                            'risk': '⚠️',
+                            'recommendation': '✅',
+                            'final': '✅'
+                        };
+                        const icon = Object.entries(icons).find(([k]) => key.toLowerCase().includes(k))?.[1] || '•';
+                        
+                        html += `<div class="brief-section">
+                            <div class="brief-section-title">
+                                <span class="icon">${icon}</span> ${key}
+                            </div>
+                            <div class="brief-list">`;
+                        
+                        // Parse list items
+                        const lines = content.split('\n').filter(l => l.trim());
+                        for (const line of lines) {
+                            if (line.match(/^[-•*]/)) {
+                                const itemText = line.replace(/^[-•*]\s*/, '');
+                                html += `<div class="brief-list-item"><span class="bullet">•</span>${itemText.replace(/\n/g, '<br>')}</div>`;
+                            } else if (line.trim()) {
+                                html += `<div class="brief-list-item"><span class="bullet">•</span>${line}</div>`;
+                            }
+                        }
+                        
+                        html += '</div></div>';
+                    }
+                }
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        function addMessage(text, role='bot', isMeta=false){
+            if (isMeta) {
+                // Filter out placeholder/default metadata
+                if (!text || text.includes('Ticker: N/A') || text.includes('Ticker: GENERAL') || text.includes('Risk: N/A')) return;
+            }
+            const wrap = document.createElement('div'); wrap.className = `msg ${role}`;
+            const bubble = document.createElement('div'); 
+            bubble.className = 'bubble ' + (isArabic(text) ? 'message-rtl' : 'message-ltr');
+            
+            // Try to format as Investment Brief for bot messages
+            if (role === 'bot') {
+                const briefHtml = formatInvestmentBrief(text);
+                if (briefHtml) {
+                    bubble.innerHTML = briefHtml;
+                    wrap.appendChild(bubble);
+                    const ts = document.createElement('div'); ts.className='ts'; ts.textContent = formatTime(); wrap.appendChild(ts);
+                    messagesEl.appendChild(wrap);
+                    messagesEl.scrollTop = messagesEl.scrollHeight;
+                    return;
+                }
+            }
+            
+            // Fallback: allow HTML for simple formatting
+            bubble.innerHTML = String(text).replace(/\n/g,'<br>');
+            wrap.appendChild(bubble);
+            if (isMeta) {
+                const meta = document.createElement('div'); meta.className='meta'; meta.textContent = text; wrap.appendChild(meta);
+            }
+            const ts = document.createElement('div'); ts.className='ts'; ts.textContent = formatTime(); wrap.appendChild(ts);
+            messagesEl.appendChild(wrap);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        function addDecisionMessage(decision, reason, fullResult = null){
+            if (!decision || decision === 'HOLD') {
+                if (!reason || reason === 'Analysis completed' || reason === 'No specific analysis available') {
+                    if (reason) addMessage(reason, 'bot');
+                    return;
+                }
+            }
+            const wrap = document.createElement('div'); wrap.className='msg decision';
+            wrap.id = `decision-${Date.now()}`;
+            const bubble = document.createElement('div'); 
+            bubble.className = 'bubble ' + (isArabic(reason) ? 'message-rtl' : 'message-ltr');
+            const decisionColor = decision==='BUY'? '🟢 BUY' : decision==='SELL'? '🔴 SELL' : '⚪ HOLD';
+            
+            let html = `<strong>📊 Decision: ${decisionColor}</strong><br><br>${String(reason).replace(/\n/g,'<br>')}`;
+            
+            if (fullResult) {
+                // Technical Intelligence Section
+                html += `
+                    <div class="analysis-container">
+                        <div class="chart-box">
+                            <div style="font-size:10px; color:var(--muted); margin-bottom:8px; text-transform:uppercase;">Sentiment Analysis</div>
+                            <canvas id="sentimentChart-${wrap.id}"></canvas>
+                        </div>
+                        <div class="chart-box">
+                            <div style="font-size:10px; color:var(--muted); margin-bottom:8px; text-transform:uppercase;">Technical Strength</div>
+                            <canvas id="strengthChart-${wrap.id}"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="insight-card">
+                        <div class="insight-header">
+                            <span>Intelligence Explainability</span>
+                            <span style="color:var(--muted);">${fullResult.decision_translator?.confidence || 85}% Confidence</span>
+                        </div>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" style="width: 0%" id="confFill-${wrap.id}"></div>
+                        </div>
+                        <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:8px;">
+                            ${Object.keys(fullResult.financial_company?.indicators || {}).length > 0 ? '<span class="reasoning-pill">◈ Technical Indicators</span>' : ''}
+                            ${fullResult.news_items?.length > 0 ? '<span class="reasoning-pill">◈ News Sentiment</span>' : ''}
+                            ${fullResult.financial_company?.price?.support_EGP ? '<span class="reasoning-pill">◈ Support/Resistance</span>' : ''}
+                            ${fullResult.investor_profile?.risk_profile ? `<span class="reasoning-pill">◈ ${fullResult.investor_profile.risk_profile} Risk Profile</span>` : ''}
+                        </div>
+                    </div>
+
+                    <div class="report-actions">
+                        <button class="btn-report" onclick="exportToPDF('${wrap.id}', '${fullResult.ticker || 'STOCK'}')">
+                            <span>📄</span> Generate PDF Report
+                        </button>
+                    </div>
+                `;
+            }
+
+            bubble.innerHTML = html;
+            wrap.appendChild(bubble);
+            const ts = document.createElement('div'); ts.className='ts'; ts.textContent = formatTime(); wrap.appendChild(ts);
+            messagesEl.appendChild(wrap);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+
+            if (fullResult) {
+                renderDecisionCharts(wrap.id, fullResult);
+                setTimeout(() => {
+                    const fill = document.getElementById(`confFill-${wrap.id}`);
+                    if (fill) fill.style.width = (fullResult.decision_translator?.confidence || 85) + '%';
+                }, 100);
             }
         }
-        createNeuralNetwork();
 
-        // API Configuration
-        const API_BASE = "http://localhost:8000";
-        const messagesEl = document.getElementById("messages");
-        const sendBtn = document.getElementById("sendBtn");
-        const inputEl = document.getElementById("messageInput");
-        const apiStatusEl = document.getElementById("apiStatus");
+        function renderDecisionCharts(containerId, data) {
+            // Clean up existing chart instances for this ID to prevent leaks
+            if (watchlistCharts[containerId]) {
+                watchlistCharts[containerId].sent?.destroy();
+                watchlistCharts[containerId].stren?.destroy();
+            }
+            watchlistCharts[containerId] = { sent: null, stren: null };
 
-        // User Session
-        const currentUser = JSON.parse(localStorage.getItem('egx_current_user'));
-        if (!currentUser || !currentUser.id) {
-            window.location.href = 'index.html';
+            // =========================================================================
+            // DATA CONTRACT AUDIT: Expected analysis payload fields
+            // ... (existing comments)
+            // =========================================================================
+
+            const financial = data.financial_company || {};
+            const indicators = financial.indicators || {};
+            const price = financial.price || {};
+            
+            // 1. Sentiment Chart (Doughnut) - REAL (Derived from news sentiment)
+            const sentimentScore = data.news_summary?.sentiment_score || 0; 
+            const pos = Math.max(0, sentimentScore * 100);
+            const neg = Math.max(0, -sentimentScore * 100);
+            const neut = 100 - (pos + neg);
+
+            const canvasSent = document.getElementById(`sentimentChart-${containerId}`);
+            if (canvasSent) {
+                const ctxSent = canvasSent.getContext('2d');
+                watchlistCharts[containerId].sent = new Chart(ctxSent, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Positive', 'Neutral', 'Negative'],
+                        datasets: [{
+                            data: [pos || 10, neut || 80, neg || 10], 
+                            backgroundColor: ['#26c281', '#4aa3ff', '#ef6b6b'],
+                            borderWidth: 0,
+                            cutout: '80%'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { 
+                            legend: { display: false },
+                            tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw.toFixed(1)}%` } }
+                        }
+                    }
+                });
+            }
+
+            // 2. Technical Strength (Bar) - REAL (Mapped from actual indicators)
+            const rsi = indicators.RSI_14 || 50;
+            const priceToSma20 = price.current_EGP && price.sma20_EGP ? (price.current_EGP / price.sma20_EGP) * 50 : 50;
+            
+            const canvasStren = document.getElementById(`strengthChart-${containerId}`);
+            if (canvasStren) {
+                const ctxStrength = canvasStren.getContext('2d');
+                watchlistCharts[containerId].stren = new Chart(ctxStrength, {
+                    type: 'bar',
+                    data: {
+                        labels: ['RSI', 'Trend', 'Vol'],
+                        datasets: [{
+                            label: 'Internal Score',
+                            data: [rsi, Math.min(100, priceToSma20), 50],
+                            backgroundColor: 'rgba(74, 163, 255, 0.5)',
+                            borderColor: '#4aa3ff',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: { 
+                            y: { display: false, max: 100, min: 0 },
+                            x: { grid: { display: false }, ticks: { color: '#8ea3b8', font: { size: 10 } } }
+                        },
+                        plugins: { 
+                            legend: { display: false },
+                            tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw.toFixed(1)}` } }
+                        }
+                    }
+                });
+            }
         }
-        const userId = currentUser.id;
 
-        document.getElementById('userName').textContent = currentUser.username || currentUser.full_name || currentUser.email;
-        document.getElementById('userEmail').textContent = currentUser.email;
-
-        document.getElementById('logoutBtn').addEventListener('click', function() {
-            localStorage.removeItem('egx_current_user');
-            window.location.href = 'index.html';
-        });
-
-        function addMessage(text, role = "bot", isMeta = false) {
-            const div = document.createElement("div");
-            div.className = `msg ${role}`;
-            if (isMeta) div.classList.add("meta");
-            div.textContent = text;
-            messagesEl.appendChild(div);
-            messagesEl.scrollTop = messagesEl.scrollHeight;
+        async function exportToPDF(containerId, ticker) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const element = document.getElementById(containerId);
+            
+            try {
+                const canvas = await html2canvas(element, {
+                    backgroundColor: '#06111f',
+                    scale: 2
+                });
+                const imgData = canvas.toDataURL('image/png');
+                const imgProps = doc.getImageProperties(imgData);
+                const pdfWidth = doc.internal.pageSize.getWidth() - 20;
+                const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                
+                doc.setFontSize(18);
+                doc.setTextColor(74, 163, 255);
+                doc.text(`Investment Intelligence Report: ${ticker}`, 10, 15);
+                
+                doc.setFontSize(10);
+                doc.setTextColor(142, 163, 184);
+                doc.text(`Generated by EGX AI Bot | ${new Date().toLocaleString()}`, 10, 22);
+                
+                doc.addImage(imgData, 'PNG', 10, 30, pdfWidth, pdfHeight);
+                doc.save(`EGX_Report_${ticker}_${Date.now()}.pdf`);
+            } catch (error) {
+                console.error('PDF Export failed:', error);
+                alert('Failed to generate PDF report.');
+            }
         }
 
-        function addDecisionMessage(decision, reason) {
-            const decisionColor = decision === "BUY" ? "🟢 BUY" : (decision === "SELL" ? "🔴 SELL" : "⚪ HOLD");
-            const div = document.createElement("div");
-            div.className = "msg decision";
-            div.innerHTML = `<strong>📊 Decision: ${decisionColor}</strong><br><br>${reason}`;
-            messagesEl.appendChild(div);
-            messagesEl.scrollTop = messagesEl.scrollHeight;
+        async function checkApi(){ try{ const res=await fetch(`${API_BASE}/health`); if(!res.ok) throw new Error(); const status = document.getElementById('pipelineStatus'); status.textContent='Active'; status.classList.remove('offline'); status.classList.add('online'); }catch(e){ const status = document.getElementById('pipelineStatus'); status.textContent='Offline'; status.classList.remove('online'); status.classList.add('offline'); } }
+
+        async function saveUserMessage(content){ try{ await fetch(`${API_BASE}/messages`,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ role:'user', content:content, user_id:userId }) }); }catch(e){ console.warn('saveUserMessage',e); } }
+
+        async function saveBotMessage(content, llmOutput=null){ try{ await fetch(`${API_BASE}/messages`,{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ role:'assistant', content:content, user_id:userId, llm_output: llmOutput }) }); }catch(e){ console.warn('saveBotMessage',e); } }
+
+        // Use safe fallback in case currentUser is not fully loaded
+        const safeUsername = currentUser?.username || currentUser?.email || 'default-user';
+        const historyStorageKey = `egx_history_${safeUsername}`;
+        const activeHistoryKey = `egx_active_history_${safeUsername}`;
+        let historyState = { items: [], activeIndex: null, filter: '' };
+        const profileCollapsedKey = `egx_profile_collapsed_${safeUsername}`;
+        const profileWidthKey = `egx_profile_width_${safeUsername}`;
+        const profileTabKey = `egx_profile_tab_${safeUsername}`;
+        const historyCollapsedKey = `egx_history_collapsed_${safeUsername}`;
+        const historyWidthKey = `egx_history_width_${safeUsername}`;
+
+        function isMobileLayout(){
+            return window.matchMedia('(max-width: 900px)').matches;
         }
 
-        function buildPayload(message) {
+        function syncSidebarBackdrop(){
+            const drawerOpen = profilePanel.classList.contains('mobile-open') || historyPanel.classList.contains('mobile-open');
+            document.body.classList.toggle('sidebar-drawer-open', drawerOpen);
+        }
+
+        function closeMobileDrawers(){
+            profilePanel.classList.remove('mobile-open');
+            historyPanel.classList.remove('mobile-open');
+            syncSidebarBackdrop();
+        }
+
+        function getHistory(){ return JSON.parse(localStorage.getItem(historyStorageKey) || '[]'); }
+        function setActiveHistory(index){
+            historyState.activeIndex = typeof index === 'number' ? index : null;
+            if (index === null || index === undefined) {
+                localStorage.removeItem(activeHistoryKey);
+            } else {
+                localStorage.setItem(activeHistoryKey, String(index));
+            }
+            renderHistory(getHistory());
+        }
+
+        function startNewChat(){
+            messagesEl.innerHTML = '';
+            addMessage('🤖 <strong>EGX AI Bot Online</strong><br><br>Ask me about Egyptian stocks:<br>• "Analyze COMI"<br>• "Should I buy Elsewedy?"<br>• "Sentiment for TMG"','bot');
+            inputEl.value = '';
+            inputEl.style.height = '48px';
+            setActiveHistory(null);
+            closeMobileDrawers();
+        }
+
+        function toggleProfilePanel(){
+            try {
+                console.log('=== toggleProfilePanel called ===');
+                console.log('profilePanel element:', profilePanel);
+                console.log('profilePanel.classList BEFORE:', profilePanel.className);
+                const isMobile = isMobileLayout();
+                console.log('isMobileLayout:', isMobile);
+                
+                if (isMobile) {
+                    console.log('Mobile layout detected');
+                    const opening = !profilePanel.classList.contains('mobile-open');
+                    profilePanel.classList.toggle('mobile-open', opening);
+                    historyPanel.classList.remove('mobile-open');
+                    profilePanel.classList.add('collapsed');
+                    historyPanel.classList.add('collapsed');
+                    syncSidebarBackdrop();
+                    return;
+                }
+                
+                // Desktop: toggle collapsed
+                const collapsed = profilePanel.classList.toggle('collapsed');
+                console.log('✅ Collapsed class toggled, new state:', collapsed);
+                console.log('profilePanel.classList AFTER:', profilePanel.className);
+                console.log('Sidebar width should now be:', collapsed ? '72px' : 'var(--sidebar-width)');
+                localStorage.setItem(profileCollapsedKey, collapsed ? '1' : '0');
+                updateFloatingToggles();
+                console.log('=== toggleProfilePanel complete ===');
+            } catch(e) {
+                console.error('❌ Error in toggleProfilePanel:', e);
+            }
+        }
+
+        function loadProfilePanelPreference(){
+            const collapsed = localStorage.getItem(profileCollapsedKey) === '1';
+            profilePanel.classList.toggle('collapsed', collapsed);
+            updateFloatingToggles();
+        }
+
+        function loadProfilePanelWidth(){
+            const savedWidth = Number(localStorage.getItem(profileWidthKey));
+            if (Number.isFinite(savedWidth) && savedWidth >= 56) {
+                profilePanel.style.setProperty('--sidebar-width', `${savedWidth}px`);
+            }
+        }
+
+        function setupProfileResize(){
+            let dragging = false;
+            const minWidth = 220;
+            const maxWidth = 360;
+
+            const stopDrag = () => { dragging = false; document.body.style.userSelect = ''; document.body.style.cursor = ''; };
+
+            profileResizer.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                if (profilePanel.classList.contains('collapsed') || isMobileLayout()) return;
+                dragging = true;
+                document.body.style.userSelect = 'none';
+                document.body.style.cursor = 'ew-resize';
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!dragging) return;
+                const nextWidth = Math.max(minWidth, Math.min(maxWidth, e.clientX - 16));
+                profilePanel.style.setProperty('--sidebar-width', `${nextWidth}px`);
+                localStorage.setItem(profileWidthKey, String(nextWidth));
+            });
+
+            window.addEventListener('mouseup', stopDrag);
+            window.addEventListener('mouseleave', stopDrag);
+        }
+
+        function applyResponsiveSidebarState(){
+            const smallScreen = window.innerWidth < 900;
+            const autoCollapsed = smallScreen ? '1' : '0';
+            profilePanel.dataset.autoCollapsed = autoCollapsed;
+            historyPanel.dataset.autoCollapsed = autoCollapsed;
+
+            if (smallScreen) {
+                profilePanel.classList.add('collapsed');
+                historyPanel.classList.add('collapsed');
+                profilePanel.classList.remove('mobile-open');
+                historyPanel.classList.remove('mobile-open');
+                syncSidebarBackdrop();
+                updateFloatingToggles();
+                return;
+            }
+
+            profilePanel.classList.remove('mobile-open');
+            historyPanel.classList.remove('mobile-open');
+            syncSidebarBackdrop();
+            profilePanel.classList.toggle('collapsed', localStorage.getItem(profileCollapsedKey) === '1');
+            historyPanel.classList.toggle('collapsed', localStorage.getItem(historyCollapsedKey) === '1');
+            updateFloatingToggles();
+        }
+
+        function deleteHistoryItem(index){
+            const history = getHistory();
+            history.splice(index, 1);
+            localStorage.setItem(historyStorageKey, JSON.stringify(history));
+            const currentActive = Number(localStorage.getItem(activeHistoryKey));
+            if (Number.isFinite(currentActive)) {
+                if (currentActive === index) {
+                    localStorage.removeItem(activeHistoryKey);
+                    historyState.activeIndex = null;
+                } else if (currentActive > index) {
+                    localStorage.setItem(activeHistoryKey, String(currentActive - 1));
+                    historyState.activeIndex = currentActive - 1;
+                }
+            }
+            renderHistory(history);
+        }
+
+        function renderHistory(history){
+            historyState.items = history;
+            const filter = historyState.filter.trim().toLowerCase();
+            const activeIndex = Number(localStorage.getItem(activeHistoryKey));
+            historyCountEl.textContent = `${history.length}`;
+
+            const filtered = history
+                .map((item, index) => ({ item, index }))
+                .filter(({ item }) => {
+                    if (!filter) return true;
+                    const title = String(item.ticker || '').toLowerCase();
+                    const preview = String(item.preview || '').toLowerCase();
+                    return title.includes(filter) || preview.includes(filter);
+                });
+
+            if (!filtered.length) {
+                historyListEl.innerHTML = '<div class="history-empty">No matching conversations.</div>';
+                return;
+            }
+
+            historyListEl.innerHTML = filtered.map(({ item, index }) => {
+                const activeClass = activeIndex === index ? ' active' : '';
+                const preview = String(item.preview || 'No preview available');
+                return `
+                    <div class="history-card${activeClass}" data-index="${index}">
+                        <div class="history-card-title-row">
+                            <div style="min-width:0;flex:1;">
+                                <div class="history-card-title">${item.ticker || 'Unknown'}</div>
+                                <div class="history-card-date">${new Date(item.date).toLocaleDateString()}</div>
+                            </div>
+                            <button class="history-delete" type="button" data-delete-index="${index}" aria-label="Delete conversation">✕</button>
+                        </div>
+                        <div class="history-card-preview">${preview}</div>
+                    </div>
+                `;
+            }).join('');
+
+            historyListEl.querySelectorAll('.history-card').forEach(card => {
+                card.addEventListener('click', function(e){
+                    if (e.target.closest('[data-delete-index]')) return;
+                    const index = Number(this.dataset.index);
+                    const q = history[index]?.preview;
+                    if (q) {
+                        inputEl.value = q;
+                        setActiveHistory(index);
+                        sendMessage();
+                    }
+                });
+            });
+
+            historyListEl.querySelectorAll('[data-delete-index]').forEach(btn => {
+                btn.addEventListener('click', function(e){
+                    e.stopPropagation();
+                    deleteHistoryItem(Number(this.dataset.deleteIndex));
+                });
+            });
+        }
+
+        async function loadPreviousMessages(){ messagesEl.innerHTML=''; try{ const resp=await fetch(`${API_BASE}/messages/${userId}`); if(!resp.ok) throw new Error(); const msgs = await resp.json(); if(Array.isArray(msgs)&&msgs.length>0){ msgs.forEach(m=>{ if(m.role==='assistant' && m.llm_output?.assistant_text){ addMessage(m.content,'user'); 
+                const decision = m.llm_output.decision || 'HOLD';
+                const reason = m.llm_output.assistant_text;
+                const ticker = m.llm_output.metadata?.ticker || 'N/A';
+                const risk = m.llm_output.metadata?.risk_profile_used || 'N/A';
+                const fullResult = m.llm_output.raw_output || null;
+
+                if (decision !== 'HOLD' || (reason && reason !== 'Analysis completed')) {
+                    addDecisionMessage(decision, reason, fullResult);
+                } else {
+                    addMessage(reason || 'Analysis completed', 'bot');
+                }
+
+                if (ticker !== 'N/A' && ticker !== 'GENERAL' && risk !== 'N/A') {
+                    addMessage(`📁 Ticker: ${ticker} | Risk: ${risk}`,'bot',true);
+                }
+            } else { addMessage(m.content, m.role==='assistant'?'bot':'user'); } }); } else { startNewChat(); } }catch(e){ console.warn('loadPreviousMessages',e); startNewChat(); } }
+
+        /* Onboarding modal logic */
+        (function(){
+            const modal = document.getElementById('onboardModal');
+            const body = document.getElementById('onboardBody');
+            const prevBtn = document.getElementById('onboardPrev');
+            const nextBtn = document.getElementById('onboardNext');
+            const closeBtn = document.getElementById('closeOnboardBtn');
+            const setBtn = document.getElementById('setProfileBtn');
+            const editBtn = document.getElementById('editProfileBtn');
+
+            const steps = [
+                { key:'experience', title:'What is your investment experience?', options:['Beginner','Intermediate','Advanced'] },
+                { key:'horizon', title:'What is your investment horizon?', options:['Short term','Medium term','Long term'] },
+                { key:'drawdown', title:'Maximum acceptable drawdown?', options:['Low risk','Moderate risk','High risk'] },
+                { key:'style', title:'Trading style?', options:['Conservative','Balanced','Aggressive'] }
+            ];
+
+            let state = { experience:null, horizon:null, drawdown:null, style:null };
+            let idx = 0;
+
+            function openOnboard(){ loadProfileToState(); render(); modal.style.display='flex'; modal.setAttribute('aria-hidden','false'); }
+            function closeOnboard(){ modal.style.display='none'; modal.setAttribute('aria-hidden','true'); }
+
+            function render(){
+                // steps header active
+                document.querySelectorAll('.onboard-step').forEach((el,i)=>{ el.style.opacity = i===idx? '1':'0.6'; el.style.fontWeight = i===idx? '700':'500'; });
+                const s = steps[idx];
+                body.innerHTML = `<div style="font-size:15px;margin-bottom:12px;font-weight:700;color:#cfe8ff">${s.title}</div>`;
+                const opts = document.createElement('div'); opts.className='onboard-options';
+                s.options.forEach(opt=>{
+                    const but = document.createElement('div'); but.className='onboard-option'; but.textContent = opt;
+                    const selected = state[s.key] === opt;
+                    if(selected) but.classList.add('selected');
+                    but.addEventListener('click', ()=>{ state[s.key]=opt; // mark
+                        // ensure single selection
+                        opts.querySelectorAll('.onboard-option').forEach(o=>o.classList.remove('selected'));
+                        but.classList.add('selected');
+                    });
+                    opts.appendChild(but);
+                });
+                body.appendChild(opts);
+                prevBtn.style.display = idx===0? 'none':'inline-block';
+                nextBtn.textContent = idx===steps.length-1? 'Finish':'Next';
+            }
+
+            prevBtn.addEventListener('click', ()=>{ if(idx>0){ idx--; render(); } });
+            nextBtn.addEventListener('click', ()=>{ // require selection
+                const s = steps[idx]; if(!state[s.key]){ alert('Please select an option to continue'); return; }
+                if(idx < steps.length-1){ idx++; render(); } else { // finish
+                    saveProfile(); closeOnboard();
+                }
+            });
+
+            closeBtn.addEventListener('click', closeOnboard);
+
+            function mapToFields(profile){
+                // map experience -> riskProfile
+                const expMap = { 'Beginner':'conservative', 'Intermediate':'moderate', 'Advanced':'aggressive' };
+                const horMap = { 'Short term':'short', 'Medium term':'medium', 'Long term':'long' };
+                const ddMap = { 'Low risk':'low', 'Moderate risk':'medium', 'High risk':'high' };
+                const stMap = { 'Conservative':'defensive', 'Balanced':'balanced', 'Aggressive':'aggressive' };
+                return {
+                    riskProfile: expMap[profile.experience] || '',
+                    horizon: horMap[profile.horizon] || '',
+                    drawdown: ddMap[profile.drawdown] || '',
+                    style: stMap[profile.style] || ''
+                };
+            }
+
+            function saveProfile(){
+                const key = `egx_investor_profile_${safeUsername}`;
+                localStorage.setItem(key, JSON.stringify(state));
+                // map and set hidden fields used by buildPayload (if they exist)
+                const mapped = mapToFields(state);
+                const riskEl = document.getElementById('riskProfile');
+                const horizonEl = document.getElementById('horizon');
+                const drawdownEl = document.getElementById('drawdown');
+                const styleEl = document.getElementById('style');
+                if(riskEl) riskEl.value = mapped.riskProfile;
+                if(horizonEl) horizonEl.value = mapped.horizon;
+                if(drawdownEl) drawdownEl.value = mapped.drawdown;
+                if(styleEl) styleEl.value = mapped.style;
+                updateProfileCard();
+            }
+
+            function loadProfileToState(){
+                const key = `egx_investor_profile_${safeUsername}`;
+                const s = JSON.parse(localStorage.getItem(key) || 'null');
+                if(s){ state = Object.assign(state, s); }
+            }
+
+            function updateProfileCard(){
+                const key = `egx_investor_profile_${safeUsername}`;
+                const s = JSON.parse(localStorage.getItem(key) || 'null');
+                const summary = document.getElementById('profileSummary');
+                const edit = document.getElementById('editProfileBtn');
+                if(!s){ summary.textContent = 'No investor profile set.'; edit.style.display='none'; return; }
+                summary.innerHTML = `<div style="font-weight:700;color:#cfe8ff">${s.experience} • ${s.horizon}</div><div style="font-size:13px;color:#9fb7c9;margin-top:6px">Drawdown: ${s.drawdown} • Style: ${s.style}</div>`;
+                edit.style.display='inline-block';
+            }
+
+            // attach to buttons
+            setBtn.addEventListener('click', ()=>{ idx=0; loadProfileToState(); openOnboard(); });
+            editBtn.addEventListener('click', ()=>{ idx=0; loadProfileToState(); openOnboard(); });
+
+            // on load, hydrate from storage
+            loadProfileToState(); saveProfile(); updateProfileCard();
+        })();
+
+        function buildPayload(message){
             return {
                 message: message,
-                max_news: Number(document.getElementById("maxNews").value || 20),
-                user_risk_profile: document.getElementById("riskProfile").value || null,
+                max_news: Number(document.getElementById('maxNews')?.value || 20),
+                user_risk_profile: (document.getElementById('riskProfile')?.value) || null,
                 risk_answers: {
-                    investment_horizon: document.getElementById("horizon").value,
-                    max_drawdown_tolerance: document.getElementById("drawdown").value,
-                    style: document.getElementById("style").value
+                    investment_horizon: (document.getElementById('horizon')?.value) || null,
+                    max_drawdown_tolerance: (document.getElementById('drawdown')?.value) || null,
+                    style: (document.getElementById('style')?.value) || null
                 }
             };
         }
 
-        async function checkApi() {
+        async function sendMessage(){ 
             try {
-                const res = await fetch(`${API_BASE}/health`);
-                if (!res.ok) throw new Error();
-                apiStatusEl.textContent = "Online ✅";
-                apiStatusEl.style.color = "#22c55e";
-                document.getElementById('pipelineStatus').innerHTML = "Active";
-                document.getElementById('statusLed').className = "status-led online";
-            } catch {
-                apiStatusEl.textContent = "Offline ❌";
-                apiStatusEl.style.color = "#ef4444";
-                document.getElementById('pipelineStatus').innerHTML = "Offline";
-                document.getElementById('statusLed').className = "status-led offline";
-            }
-        }
-
-        async function saveUserMessage(content) {
-            try {
-                await fetch(`${API_BASE}/messages`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        role: "user",
-                        content: content,
-                        user_id: userId
-                    })
-                });
-            } catch (err) {
-                console.warn('Unable to save message:', err);
-            }
-        }
-
-        async function saveBotMessage(content, llmOutput = null) {
-            try {
-                await fetch(`${API_BASE}/messages`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        role: "assistant",
-                        content: content,
-                        user_id: userId,
-                        llm_output: llmOutput
-                    })
-                });
-            } catch (err) {
-                console.warn('Unable to save bot message:', err);
-            }
-        }
-
-        async function loadPreviousMessages() {
-            messagesEl.innerHTML = '';
-            try {
-                const response = await fetch(`${API_BASE}/messages/${userId}`);
-                if (!response.ok) throw new Error('Failed to load messages');
-                const messages = await response.json();
-
-                if (Array.isArray(messages) && messages.length > 0) {
-                    messages.forEach(msg => {
-                        if (msg.role === 'assistant' && msg.llm_output?.assistant_text) {
-                            addMessage(msg.content, 'user');
-                            addDecisionMessage(msg.llm_output.decision || 'HOLD', msg.llm_output.assistant_text);
-                            if (msg.llm_output.metadata) {
-                                addMessage(
-                                    `📁 Ticker: ${msg.llm_output.metadata.ticker || 'N/A'} | Risk: ${msg.llm_output.metadata.risk_profile_used || 'N/A'}`,
-                                    'bot',
-                                    true
-                                );
-                            }
-                        } else {
-                            addMessage(msg.content, msg.role === 'assistant' ? 'bot' : 'user');
-                        }
-                    });
-                } else {
-                    addMessage('🤖 EGX AI Bot Online\n\nAsk me about Egyptian stocks:\n• "Analyze COMI"\n• "Should I buy Elsewedy?"\n• "Sentiment for TMG"', 'bot');
-                }
-            } catch (err) {
-                console.warn(err);
-                messagesEl.innerHTML = '';
-                addMessage('🤖 EGX AI Bot Online\n\nAsk me about Egyptian stocks:\n• "Analyze COMI"\n• "Should I buy Elsewedy?"\n• "Sentiment for TMG"', 'bot');
-            }
-        }
-
-        async function sendMessage() {
-            const message = inputEl.value.trim();
-            if (!message) return;
-
-            addMessage(message, "user");
-            inputEl.value = "";
-            sendBtn.disabled = true;
-
-            const loadingMsg = document.createElement("div");
-            loadingMsg.className = "msg bot";
-            loadingMsg.innerHTML = "⏳ Processing...";
-            messagesEl.appendChild(loadingMsg);
-            messagesEl.scrollTop = messagesEl.scrollHeight;
-
-            try {
-                const payload = buildPayload(message);
-                const response = await fetch(`${API_BASE}/chat/message`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
-                });
-
-                loadingMsg.remove();
-                const data = await response.json();
-
-                if (!response.ok || data.status !== "success") {
-                    throw new Error(data?.error || data?.detail || "Request failed");
-                }
-
-                const finalResult = data.final_result || {};
-                const decision = finalResult?.decision_translator?.buy_or_not || "HOLD";
-                const simpleReason = finalResult?.decision_translator?.simple_reason || data.chat_reply || "Analysis completed";
-
-                // Display the full chat reply (detailed analysis) instead of just decision + simple reason
-                if (data.chat_reply) {
-                    addMessage(data.chat_reply, "bot");
-                } else {
-                    // Fallback: show decision + simple reason if chat_reply is not available
-                    addDecisionMessage(decision, simpleReason);
-                }
-
-                const metadata = {
-                    ticker: data.ticker || 'N/A',
-                    risk_profile_used: data.risk_profile_used || 'N/A'
-                };
-                addMessage(`📁 Ticker: ${metadata.ticker} | Risk: ${metadata.risk_profile_used}`, "bot", true);
-
-                // Save the user question and assistant output in the same DB row
-                await saveBotMessage(message, {
-                    assistant_text: simpleReason,
-                    decision: decision,
-                    metadata: metadata,
-                    raw_output: finalResult
-                });
-
-                saveToHistory(data.ticker || 'Unknown', message.substring(0, 40));
-
-            } catch (err) {
-                loadingMsg.remove();
-                addMessage(`❌ Error: ${err.message}`, "bot");
-            } finally {
-                sendBtn.disabled = false;
-                inputEl.focus();
-            }
-        }
-
-        function saveToHistory(ticker, preview) {
-            const history = JSON.parse(localStorage.getItem(`egx_history_${currentUser.username}`) || '[]');
-            const newEntry = {
-                ticker: ticker,
-                preview: preview,
-                date: new Date().toISOString()
-            };
-            const filtered = history.filter(h => h.ticker !== ticker);
-            filtered.unshift(newEntry);
-            localStorage.setItem(`egx_history_${currentUser.username}`, JSON.stringify(filtered.slice(0, 15)));
-            loadHistory();
-        }
-
-        function loadHistory() {
-            const history = JSON.parse(localStorage.getItem(`egx_history_${currentUser.username}`) || '[]');
-            document.getElementById('historyCount').textContent = `${history.length}`;
-            
-            if (history.length > 0) {
-                const historyHtml = history.map((h, idx) => `
-                    <div class="history-item" data-index="${idx}">
-                        <div class="history-company">📌 ${h.ticker}</div>
-                        <div class="history-date">${new Date(h.date).toLocaleDateString()}</div>
-                        <div class="history-preview">${h.preview.substring(0, 35)}...</div>
-                    </div>
-                `).join('');
-                document.getElementById('historyList').innerHTML = historyHtml;
+                console.log('=== sendMessage called ===');
+                console.log('inputEl:', inputEl);
+                console.log('messagesEl:', messagesEl);
+                console.log('sendBtn:', sendBtn);
                 
-                document.querySelectorAll('.history-item').forEach(item => {
-                    item.addEventListener('click', function() {
-                        const idx = parseInt(this.dataset.index);
-                        const query = history[idx]?.preview;
-                        if (query) {
-                            inputEl.value = query;
-                            sendMessage();
-                        }
-                    });
+                const message = inputEl.value.trim(); 
+                console.log('Message text:', message);
+                if(!message) {
+                    console.log('⚠️ Message is empty, returning');
+                    return;
+                }
+                
+                if (!messagesEl) {
+                    console.error('❌ CRITICAL: messagesEl is null!');
+                    alert('Chat display error - messagesEl not found');
+                    return;
+                }
+                
+                // user bubble
+                try {
+                    const userWrap = document.createElement('div'); 
+                    userWrap.className='msg user'; 
+                    const userBubble=document.createElement('div'); 
+                    userBubble.className='bubble'; 
+                    userBubble.textContent = message; 
+                    userWrap.appendChild(userBubble); 
+                    const userTs=document.createElement('div'); 
+                    userTs.className='ts'; 
+                    userTs.textContent = formatTime(); 
+                    userWrap.appendChild(userTs); 
+                    messagesEl.appendChild(userWrap); 
+                    messagesEl.scrollTop = messagesEl.scrollHeight;
+                    console.log('✅ User message displayed');
+                } catch(e) {
+                    console.error('❌ Error displaying user message:', e);
+                }
+
+                inputEl.value=''; 
+                inputEl.style.height = '48px'; // Reset height
+                sendBtn.disabled = true; 
+                inputEl.focus();
+
+                // loading bubble
+                const loadingWrap = document.createElement('div'); 
+                loadingWrap.className='msg bot'; 
+                const loadingBubble = document.createElement('div'); 
+                loadingBubble.className='bubble'; 
+                const loader = document.createElement('div'); 
+                loader.className='loader'; 
+                loader.innerHTML = '<span></span><span></span><span></span>'; 
+                loadingBubble.appendChild(loader); 
+                loadingWrap.appendChild(loadingBubble); 
+                messagesEl.appendChild(loadingWrap); 
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+                console.log('✅ Loading indicator shown');
+
+                // Timeout controller for long analysis
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+
+                await saveUserMessage(message);
+                const payload = buildPayload(message);
+                console.log('📡 Sending payload to API:', payload);
+                const resp = await fetch(`${API_BASE}/chat/message`,{ 
+                    method:'POST', 
+                    headers:{'Content-Type':'application/json'}, 
+                    body:JSON.stringify(payload),
+                    signal: controller.signal
                 });
-            } else {
-                document.getElementById('historyList').innerHTML = '<div style="text-align: center; padding: 30px 15px; color: #a0aec0; font-size: 11px;">No conversations yet.</div>';
+                console.log('📥 API Response status:', resp.status, resp.statusText);
+                clearTimeout(timeoutId);
+                const data = await resp.json();
+                console.log('📥 API Response data:', data);
+                loadingWrap.remove();
+                if(!resp.ok || data.status!=='success'){ throw new Error(data?.error||data?.detail||'Analysis failed or timed out. Please try a simpler query.'); }
+
+                const finalResult = data.final_result||{}; 
+                const decision = finalResult?.decision_translator?.buy_or_not || 'HOLD'; 
+                const simpleReason = finalResult?.decision_translator?.simple_reason || data.chat_reply || 'Analysis completed';
+                
+                // Only show decision message if it's not a placeholder HOLD or if there's no cleaner chat_reply
+                if(data.chat_reply){ 
+                    addMessage(data.chat_reply,'bot'); 
+                } else if (decision !== 'HOLD' || (simpleReason && simpleReason !== 'Analysis completed')) {
+                    addDecisionMessage(decision, simpleReason, finalResult); 
+                } else {
+                    addMessage(simpleReason, 'bot');
+                }
+
+                const ticker = data.ticker || 'N/A';
+                const risk = data.risk_profile_used || 'N/A';
+                
+                // Only show metadata if it's actually meaningful
+                if (ticker !== 'N/A' && ticker !== 'GENERAL' && risk !== 'N/A') {
+                    addMessage(`📁 Ticker: ${ticker} | Risk: ${risk}`,'bot',true);
+                }
+
+                await saveBotMessage(message,{ assistant_text: simpleReason, decision: decision, metadata: {ticker, risk_profile_used: risk}, raw_output: finalResult });
+                saveToHistory(data.ticker||'Unknown', message.substring(0,40));
+                console.log('✅ sendMessage complete');
+            }catch(err){ 
+                console.error('❌ Error in sendMessage:', err); 
+                try {
+                    loadingWrap?.remove();
+                } catch(e) {}
+                addMessage(`❌ Error: ${err.message}`,'bot'); 
+            }
+            finally{ 
+                sendBtn.disabled=false; 
+                inputEl.focus(); 
+                console.log('=== sendMessage finished ===');
             }
         }
 
-        async function clearHistory() {
-            if (!confirm('Clear all conversation history? This will delete server-side messages for this user too.')) {
+        async function saveToHistory(ticker, preview){
+            const history = getHistory();
+            const newEntry = { ticker, preview, date: new Date().toISOString() };
+            const filtered = history.filter(h=>h.ticker!==ticker);
+            filtered.unshift(newEntry);
+            localStorage.setItem(historyStorageKey, JSON.stringify(filtered.slice(0,15)));
+            localStorage.setItem(activeHistoryKey, '0');
+            historyState.activeIndex = 0;
+            renderHistory(getHistory());
+        }
+
+        async function clearHistory(){ if(!confirm('Clear all conversation history? This will delete server-side messages for this user too.')) return; try{ const r = await fetch(`${API_BASE}/messages/user/${userId}`,{ method:'DELETE', headers:{'Content-Type':'application/json'} }); const result = await r.json(); if(!r.ok) throw new Error(result?.error||result?.detail||'Failed'); localStorage.removeItem(historyStorageKey); localStorage.removeItem(activeHistoryKey); historyState.activeIndex = null; renderHistory([]); messagesEl.innerHTML=''; addMessage('✅ Server messages deleted successfully. Conversation history has been cleared.','bot'); loadPreviousMessages(); }catch(e){ addMessage(`❌ Error deleting server messages: ${e.message}`,'bot'); } }
+
+        function toggleHistoryPanel(){
+            try {
+                console.log('=== toggleHistoryPanel called ===');
+                console.log('historyPanel element:', historyPanel);
+                console.log('historyPanel.classList BEFORE:', historyPanel.className);
+                const isMobile = isMobileLayout();
+                console.log('isMobileLayout:', isMobile);
+                
+                if (isMobile) {
+                    console.log('Mobile layout detected');
+                    const opening = !historyPanel.classList.contains('mobile-open');
+                    historyPanel.classList.toggle('mobile-open', opening);
+                    profilePanel.classList.remove('mobile-open');
+                    profilePanel.classList.add('collapsed');
+                    historyPanel.classList.add('collapsed');
+                    syncSidebarBackdrop();
+                    return;
+                }
+                
+                // Desktop: toggle collapsed
+                const collapsed = historyPanel.classList.toggle('collapsed');
+                console.log('✅ Collapsed class toggled, new state:', collapsed);
+                console.log('historyPanel.classList AFTER:', historyPanel.className);
+                console.log('History width should now be:', collapsed ? '72px' : 'var(--history-width)');
+                localStorage.setItem(historyCollapsedKey, collapsed ? '1' : '0');
+                updateFloatingToggles();
+                console.log('=== toggleHistoryPanel complete ===');
+            } catch(e) {
+                console.error('❌ Error in toggleHistoryPanel:', e);
+            }
+        }
+
+        function loadPanelPreference(){
+            const collapsed = localStorage.getItem(historyCollapsedKey) === '1';
+            historyPanel.classList.toggle('collapsed', collapsed);
+            updateFloatingToggles();
+        }
+
+        function updateFloatingToggles() {
+            console.log('🔄 updateFloatingToggles called');
+            if (isMobileLayout()) {
+                console.log('Mobile layout - showing both toggles');
+                floatingProfileToggle.classList.add('visible');
+                floatingHistoryToggle.classList.add('visible');
+                return;
+            }
+            const profileCollapsed = profilePanel.classList.contains('collapsed');
+            const historyCollapsed = historyPanel.classList.contains('collapsed');
+            console.log('Desktop layout - profile collapsed:', profileCollapsed, 'history collapsed:', historyCollapsed);
+            floatingProfileToggle.classList.toggle('visible', profileCollapsed);
+            floatingHistoryToggle.classList.toggle('visible', historyCollapsed);
+            console.log('Floating toggles visible - profile:', floatingProfileToggle.classList.contains('visible'), 'history:', floatingHistoryToggle.classList.contains('visible'));
+        }
+
+        function setupHistoryResize(){
+            let dragging = false;
+            const minWidth = 240;
+            const maxWidth = 420;
+
+            const stopDrag = () => { dragging = false; document.body.style.userSelect = ''; document.body.style.cursor = ''; };
+
+            historyResizer.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                if (historyPanel.classList.contains('collapsed') || isMobileLayout()) return;
+                dragging = true;
+                document.body.style.userSelect = 'none';
+                document.body.style.cursor = 'ew-resize';
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!dragging) return;
+                const nextWidth = Math.max(minWidth, Math.min(maxWidth, window.innerWidth - e.clientX - 16));
+                historyPanel.style.setProperty('--history-width', `${nextWidth}px`);
+                localStorage.setItem(historyWidthKey, String(nextWidth));
+            });
+
+            window.addEventListener('mouseup', stopDrag);
+            window.addEventListener('mouseleave', stopDrag);
+        }
+
+        function loadPanelWidth(){
+            const savedWidth = Number(localStorage.getItem(historyWidthKey));
+            if (Number.isFinite(savedWidth) && savedWidth >= 220) {
+                historyPanel.style.setProperty('--history-width', `${savedWidth}px`);
+            }
+        }
+
+        // wire events WITH NULL CHECKS
+        console.log('🔌 Wiring event listeners...');
+        try {
+            // Chat controls
+            if (sendBtn && inputEl) {
+                sendBtn.addEventListener('click', () => {
+                    console.log('👆 Send button clicked');
+                    sendMessage();
+                });
+                console.log("✅ Send button listener attached");
+                
+                inputEl.addEventListener('keydown', (e) => { 
+                    if(e.key==='Enter' && !e.shiftKey){ 
+                        console.log('⌨️ Enter key pressed');
+                        e.preventDefault(); 
+                        sendMessage(); 
+                    } 
+                });
+                console.log("✅ Input keydown listener attached");
+            } else {
+                console.error("❌ Chat controls not found!", {sendBtn, inputEl});
+            }
+
+            // Other history button
+            const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+            if (clearHistoryBtn) {
+                clearHistoryBtn.addEventListener('click', clearHistory);
+                console.log("✅ Clear history listener attached");
+            }
+
+            // New chat button
+            if (newChatBtn) {
+                newChatBtn.addEventListener('click', startNewChat);
+                console.log("✅ New chat listener attached");
+            }
+
+            // Sidebar toggles WITH NULL CHECKS
+            if (toggleHistoryBtn) {
+                toggleHistoryBtn.addEventListener('click', () => {
+                    console.log('👆 Toggle history button clicked');
+                    toggleHistoryPanel();
+                });
+                console.log("✅ Toggle history listener attached");
+            } else {
+                console.error("❌ toggleHistoryBtn not found");
+            }
+
+            if (toggleProfileBtn) {
+                toggleProfileBtn.addEventListener('click', () => {
+                    console.log('👆 Toggle profile button clicked');
+                    toggleProfilePanel();
+                });
+                console.log("✅ Toggle profile listener attached");
+            } else {
+                console.error("❌ toggleProfileBtn not found");
+            }
+
+            // Floating toggles
+            if (floatingProfileToggle) {
+                floatingProfileToggle.addEventListener('click', () => {
+                    console.log('👆 Floating profile toggle clicked');
+                    toggleProfilePanel();
+                });
+                console.log("✅ Floating profile toggle listener attached");
+            }
+
+            if (floatingHistoryToggle) {
+                floatingHistoryToggle.addEventListener('click', () => {
+                    console.log('👆 Floating history toggle clicked');
+                    toggleHistoryPanel();
+                });
+                console.log("✅ Floating history toggle listener attached");
+            }
+
+            // Backdrop
+            if (sidebarBackdrop) {
+                sidebarBackdrop.addEventListener('click', closeMobileDrawers);
+                console.log("✅ Backdrop listener attached");
+            }
+
+            // History search
+            if (historySearchEl) {
+                historySearchEl.addEventListener('input', function(){ historyState.filter = this.value; renderHistory(getHistory()); });
+                console.log("✅ History search listener attached");
+            }
+
+            // Input auto-height
+            if (inputEl) {
+                inputEl.addEventListener('input', function(){ this.style.height='auto'; this.style.height = Math.min(120, this.scrollHeight) + 'px'; });
+                console.log("✅ Input auto-height listener attached");
+            }
+
+            console.log('✅ All event listeners wired successfully');
+        } catch(e) {
+            console.error("❌ Error wiring event listeners:", e);
+        }
+
+        console.log('🔧 Initializing panels and preferences...');
+        try {
+            loadProfilePanelPreference();
+            loadProfilePanelWidth();
+            setupProfileResize();
+            loadPanelPreference();
+            loadPanelWidth();
+            setupHistoryResize();
+            window.addEventListener('resize', applyResponsiveSidebarState);
+            applyResponsiveSidebarState();
+            loadSidebarTabPreference();
+            console.log('✅ Panels initialized');
+        } catch(e) {
+            console.error("❌ Error initializing panels:", e);
+        }
+        
+        console.log('📊 Loading data...');
+        checkApi(); 
+        renderHistory(getHistory()); 
+        loadPreviousMessages(); 
+        setInterval(checkApi,30000);
+        console.log('✅ Dashboard fully loaded and ready')
+
+        // Sidebar Tab Switching
+        function switchSidebarTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            localStorage.setItem(profileTabKey, tab);
+            
+            if(tab === 'profile') {
+                document.querySelector('.tab-btn:nth-child(1)').classList.add('active');
+                document.getElementById('profileTab').classList.add('active');
+            } else {
+                document.querySelector('.tab-btn:nth-child(2)').classList.add('active');
+                document.getElementById('marketTab').classList.add('active');
+                loadWatchlist();
+                loadPortfolio();
+            }
+        }
+        
+        function loadSidebarTabPreference() {
+            const saved = localStorage.getItem(profileTabKey) || 'profile';
+            switchSidebarTab(saved);
+        }
+
+        // Watchlist Functions
+        let watchlistCharts = {}; // Track chart instances to prevent leaks
+
+        async function loadWatchlist() {
+            console.log('📥 Loading watchlist from API_BASE:', API_BASE);
+            const container = document.getElementById('watchlistContainer');
+            container.innerHTML = `
+                <div class="watchlist-item skeleton" style="height:50px"></div>
+                <div class="watchlist-item skeleton" style="height:50px"></div>
+            `;
+
+            try {
+                console.log('Fetching from:', `${API_BASE}/watchlist/${userId}`);
+                const res = await fetch(`${API_BASE}/watchlist/${userId}`);
+                console.log('Watchlist response status:', res.status, res.statusText);
+                if (!res.ok) throw new Error('Failed to fetch watchlist');
+                const data = await res.json();
+                console.log('Watchlist data:', data);
+                
+                if(!data || data.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <span class="icon">📈</span>
+                            <div>Your watchlist is empty</div>
+                            <div style="font-size:11px; margin-top:4px;">Add tickers to track EGX stocks</div>
+                        </div>
+                    `;
+                    return;
+                }
+                container.innerHTML = data.map(item => {
+                    const lastAnalysis = item.last_analysis;
+                    const rec = lastAnalysis?.decision_translator?.buy_or_not || 'HOLD';
+                    const tagClass = rec === 'BUY' ? 'tag-buy' : rec === 'SELL' ? 'tag-sell' : 'tag-hold';
+                    
+                    return `
+                        <div class="watchlist-item">
+                            <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+                                <span class="ticker-badge">${item.ticker}</span>
+                                ${lastAnalysis ? `<span class="recommendation-tag ${tagClass}">${rec}</span>` : '<span style="font-size:9px; color:var(--muted)">Pending analysis</span>'}
+                            </div>
+                            <div style="display:flex; gap:6px;">
+                                <button onclick="analyzeTicker('${item.ticker}')" class="icon-btn" title="Run AI Analysis">🔍</button>
+                                <button onclick="removeFromWatchlist('${item.id}')" class="icon-btn" title="Remove" style="color:var(--danger); border-color:rgba(239,107,107,0.1)">✕</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch(e) { 
+                console.error('❌ loadWatchlist error:', e); 
+                container.innerHTML = '<div class="empty-state" style="color:var(--danger)">⚠️ Error loading watchlist</div>';
+            }
+        }
+
+        async function addToWatchlist() {
+            const input = document.getElementById('watchlistInput');
+            const ticker = input.value.trim().toUpperCase();
+            console.log('📥 addToWatchlist called for ticker:', ticker);
+            if(!ticker) return;
+
+            // Simple validation: ticker should be 3-5 chars for EGX mostly
+            if(ticker.length < 2) return;
+
+            try {
+                console.log('📡 Sending watchlist POST to:', `${API_BASE}/watchlist`);
+                const res = await fetch(`${API_BASE}/watchlist`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ ticker, user_id: userId })
+                });
+                console.log('📥 Watchlist response status:', res.status, res.statusText);
+                if(res.ok) {
+                    console.log('✅ Ticker added successfully');
+                    input.value = '';
+                    loadWatchlist();
+                } else {
+                    const err = await res.json();
+                    console.error('❌ Watchlist error response:', err);
+                    alert(`Error: ${err.detail || 'Could not add ticker'}`);
+                }
+            } catch(e) {
+                console.error('❌ addToWatchlist exception:', e);
+                alert("Connection failed. Ensure backend is running.");
+            }
+        }
+
+        async function removeFromWatchlist(id) {
+            if(!confirm('Remove from watchlist?')) return;
+            try {
+                const res = await fetch(`${API_BASE}/watchlist/${id}`, { method: 'DELETE' });
+                if(res.ok) loadWatchlist();
+            } catch(e) { console.error('removeFromWatchlist', e); }
+        }
+
+        function analyzeTicker(ticker) {
+            inputEl.value = `Analyze ${ticker}`;
+            sendMessage();
+        }
+
+        // Portfolio Functions
+        async function loadPortfolio() {
+            const container = document.getElementById('holdingsList');
+            const totalEl = document.getElementById('totalInvested');
+            const countEl = document.getElementById('holdingsCount');
+            const sentimentEl = document.getElementById('portfolioSentiment');
+
+            container.innerHTML = '<div class="holding-card skeleton" style="height:60px; margin-bottom:8px;"></div>';
+
+            try {
+                const res = await fetch(`${API_BASE}/portfolio/${userId}`);
+                if (!res.ok) throw new Error('Failed to fetch portfolio');
+                const data = await res.json();
+                
+                countEl.textContent = data.length || 0;
+
+                if(!data || data.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <span class="icon">💼</span>
+                            <div>No holdings found</div>
+                            <div style="font-size:11px; margin-top:4px;">Log your EGX positions here</div>
+                        </div>
+                    `;
+                    totalEl.textContent = 'EGP 0.00';
+                    sentimentEl.textContent = 'N/A';
+                    return;
+                }
+
+                let total = 0;
+                container.innerHTML = data.map(h => {
+                    const cost = h.quantity * h.avg_buy_price;
+                    total += cost;
+                    return `
+                        <div class="holding-card">
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span class="ticker-badge" style="background:rgba(255,255,255,0.06); color:var(--text); border:1px solid var(--border);">${h.ticker}</span>
+                                    <span style="font-size:12px; font-weight:700; color:var(--accent);">EGP ${cost.toLocaleString()}</span>
+                                </div>
+                                <button onclick="deleteHolding('${h.id}')" class="icon-btn" style="width:24px;height:24px;background:transparent;border:0;color:var(--muted);">✕</button>
+                            </div>
+                            <div class="holding-stats">
+                                <div>Shares: <strong style="color:var(--text)">${h.quantity}</strong></div>
+                                <div>Avg: <strong style="color:var(--text)">${h.avg_buy_price}</strong></div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                totalEl.textContent = `EGP ${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+                
+                // Demo sentiment logic based on holdings count for now
+                sentimentEl.textContent = total > 100000 ? 'Bullish' : 'Balanced';
+                sentimentEl.className = 'stat-value ' + (total > 100000 ? 'positive' : '');
+            } catch(e) { 
+                console.error('loadPortfolio', e); 
+                container.innerHTML = '<div class="empty-state" style="color:var(--danger)">⚠️ Error loading portfolio</div>';
+            }
+        }
+
+        async function addToPortfolio() {
+            const tickerEl = document.getElementById('holdingTicker');
+            const qtyEl = document.getElementById('holdingQty');
+            const priceEl = document.getElementById('holdingPrice');
+            
+            const ticker = tickerEl.value.trim().toUpperCase();
+            const quantity = parseFloat(qtyEl.value);
+            const price = parseFloat(priceEl.value);
+
+            if(!ticker || isNaN(quantity) || quantity <= 0 || isNaN(price) || price <= 0) {
+                alert('Please enter valid ticker, quantity and price.');
                 return;
             }
 
             try {
-                const response = await fetch(`${API_BASE}/messages/user/${userId}`, {
-                    method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' }
+                const res = await fetch(`${API_BASE}/portfolio`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ ticker, quantity, avg_buy_price: price, user_id: userId })
                 });
-
-                const result = await response.json();
-                if (!response.ok) {
-                    throw new Error(result?.error || result?.detail || 'Failed to delete server messages');
+                if(res.ok) {
+                    tickerEl.value = '';
+                    qtyEl.value = '';
+                    priceEl.value = '';
+                    loadPortfolio();
                 }
-
-                localStorage.removeItem(`egx_history_${currentUser.username}`);
-                loadHistory();
-                messagesEl.innerHTML = '';
-                addMessage('✅ Server messages deleted successfully. Conversation history has been cleared.', 'bot');
-                loadPreviousMessages();
-            } catch (err) {
-                addMessage(`❌ Error deleting server messages: ${err.message}`, 'bot');
-            }
+            } catch(e) { console.error('addToPortfolio', e); }
         }
 
-        sendBtn.addEventListener("click", sendMessage);
-        document.getElementById('clearHistoryBtn').addEventListener('click', clearHistory);
-        inputEl.addEventListener("keydown", (e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
+        async function deleteHolding(id) {
+            if(!confirm('Permanently remove this holding?')) return;
+            try {
+                const res = await fetch(`${API_BASE}/portfolio/${id}`, { method: 'DELETE' });
+                if(res.ok) loadPortfolio();
+            } catch(e) { console.error('deleteHolding', e); }
+        }
+
+        // Demo Presets for Graduation Presentation
+        async function setupDemoData() {
+            if(!confirm("Load demo stock presets? (COMI, FWRY, ABUK)")) return;
+            
+            const demoWatchlist = ["COMI", "FWRY", "ABUK"];
+            const demoPortfolio = [
+                { ticker: "COMI", quantity: 100, avg_buy_price: 82.5 },
+                { ticker: "FWRY", quantity: 500, avg_buy_price: 5.4 }
+            ];
+
+            try {
+                // Load Watchlist
+                for(const ticker of demoWatchlist) {
+                    await fetch(`${API_BASE}/watchlist`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ ticker, user_id: userId })
+                    });
+                }
+                // Load Portfolio
+                for(const h of demoPortfolio) {
+                    await fetch(`${API_BASE}/portfolio`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ ...h, user_id: userId })
+                    });
+                }
+                loadWatchlist();
+                loadPortfolio();
+                alert("Demo data preloaded successfully.");
+            } catch(e) {
+                console.error("Demo setup failed", e);
+                alert("Failed to load demo data. Check if backend is running.");
             }
-        });
-        document.getElementById('clearHistoryBtn').addEventListener('click', clearHistory);
-
-        inputEl.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = Math.min(80, this.scrollHeight) + 'px';
-        });
-
-        checkApi();
-        loadHistory();
-        loadPreviousMessages();
-        setInterval(checkApi, 30000);
-        inputEl.focus();
+        }
     </script>
 </body>
 </html>

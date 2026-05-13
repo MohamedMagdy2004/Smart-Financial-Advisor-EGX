@@ -1,10 +1,68 @@
-from models import User, Message
+from models import User, Message, Watchlist, PortfolioHolding
 from sqlalchemy.orm import Session
-from schemas import UserCreate, MessageCreate
+from schemas import UserCreate, MessageCreate, WatchlistCreate, PortfolioHoldingCreate, PortfolioHoldingUpdate
 import bcrypt
 import uuid
 
-def create_user(db: Session, data: UserCreate):
+# ... existing user and message services ...
+
+# ==================== Watchlist Services ====================
+
+def get_watchlist(db: Session, user_id: uuid.UUID):
+    return db.query(Watchlist).filter(Watchlist.user_id == user_id).all()
+
+def add_watchlist_item(db: Session, data: WatchlistCreate):
+    # Check if already exists to prevent duplicates
+    existing = db.query(Watchlist).filter(
+        Watchlist.user_id == data.user_id, 
+        Watchlist.ticker == data.ticker
+    ).first()
+    if existing:
+        return existing
+    
+    item = Watchlist(**data.model_dump())
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+def remove_watchlist_item(db: Session, item_id: uuid.UUID):
+    item = db.query(Watchlist).filter(Watchlist.id == item_id).first()
+    if item:
+        db.delete(item)
+        db.commit()
+    return item
+
+# ==================== Portfolio Services ====================
+
+def get_portfolio(db: Session, user_id: uuid.UUID):
+    return db.query(PortfolioHolding).filter(PortfolioHolding.user_id == user_id).all()
+
+def add_portfolio_holding(db: Session, data: PortfolioHoldingCreate):
+    holding = PortfolioHolding(**data.model_dump())
+    db.add(holding)
+    db.commit()
+    db.refresh(holding)
+    return holding
+
+def update_portfolio_holding(db: Session, holding_id: uuid.UUID, data: PortfolioHoldingUpdate):
+    holding = db.query(PortfolioHolding).filter(PortfolioHolding.id == holding_id).first()
+    if not holding:
+        return None
+    
+    for key, value in data.model_dump(exclude_unset=True).items():
+        setattr(holding, key, value)
+    
+    db.commit()
+    db.refresh(holding)
+    return holding
+
+def delete_portfolio_holding(db: Session, holding_id: uuid.UUID):
+    holding = db.query(PortfolioHolding).filter(PortfolioHolding.id == holding_id).first()
+    if holding:
+        db.delete(holding)
+        db.commit()
+    return holding
     # Hash the password
     hashed_password = bcrypt.hashpw(data.password.encode('utf-8'), bcrypt.gensalt())
     

@@ -336,7 +336,23 @@ def _score_trend(trend: str) -> int:
         return 0
 
 
-def _build_company_payload(symbol: str, risk_profile: str, df: pd.DataFrame) -> Dict[str, Any]:
+def _drawdown_midpoint(drawdown_tolerance: Optional[str], risk_profile: str) -> float:
+    normalized = str(drawdown_tolerance or "").strip().lower()
+    if normalized == "low":
+        return 0.05
+    if normalized == "medium":
+        return 0.15
+    if normalized == "high":
+        return 0.25
+
+    if risk_profile == "conservative":
+        return 0.05
+    if risk_profile == "aggressive":
+        return 0.25
+    return 0.15
+
+
+def _build_company_payload(symbol: str, risk_profile: str, df: pd.DataFrame, drawdown_tolerance: Optional[str] = None) -> Dict[str, Any]:
     """Comprehensive 7-signal scoring matching EGX_Trading_System_4.ipynb."""
     if len(df) < 5:
         raise ValueError(f"Insufficient data: {len(df)} rows")
@@ -400,6 +416,8 @@ def _build_company_payload(symbol: str, risk_profile: str, df: pd.DataFrame) -> 
     
     confidence = CONFIDENCE_PRIORS.get(decision, 50.0)
     confidence_note = f"{decision} signal based on {abs(total_score)}-point composite score from 7 indicators."
+    drawdown_midpoint = _drawdown_midpoint(drawdown_tolerance, risk_profile)
+    stop_loss = round(price * (1 - drawdown_midpoint), 2) if not np.isnan(price) else None
     
     return {
         "symbol": symbol,
@@ -449,7 +467,7 @@ def _build_company_payload(symbol: str, risk_profile: str, df: pd.DataFrame) -> 
             "applicable": decision in ("BUY", "STRONG BUY"),
             "suggested_shares": None,
             "position_cost_EGP": None,
-            "stop_loss_EGP": None,
+            "stop_loss_EGP": stop_loss,
             "take_profit_EGP": None,
             "capital_at_risk_EGP": None,
             "risk_pct_of_capital": None,
@@ -470,6 +488,7 @@ def _build_company_payload(symbol: str, risk_profile: str, df: pd.DataFrame) -> 
 def generate_part2_financial_json(
     ticker: str,
     user_risk_profile: str,
+    drawdown_tolerance: Optional[str] = None,
     from_date: str = "2024-01-01",
 ) -> Dict[str, Any]:
     symbol = ticker.upper().strip()
@@ -511,7 +530,7 @@ def generate_part2_financial_json(
     if df.empty:
         raise RuntimeError("Insufficient indicator rows after preprocessing")
 
-    company_payload = _build_company_payload(symbol, user_risk_profile, df)
+    company_payload = _build_company_payload(symbol, user_risk_profile, df, drawdown_tolerance=drawdown_tolerance)
     part2_json = {
         "part": "financial_analysis",
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),

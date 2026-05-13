@@ -57,7 +57,48 @@ class MessageList(BaseModel):
     count: int
     messages: List[Message]
 
+# ==================== Portfolio & Watchlist Schemas ====================
 
+class WatchlistBase(BaseModel):
+    ticker: str
+
+class WatchlistCreate(WatchlistBase):
+    user_id: UUID
+
+class WatchlistResponse(WatchlistBase):
+    id: UUID
+    user_id: UUID
+    last_analysis: Optional[dict] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class PortfolioHoldingBase(BaseModel):
+    ticker: str
+    quantity: float
+    avg_buy_price: float
+
+class PortfolioHoldingCreate(PortfolioHoldingBase):
+    user_id: UUID
+
+class PortfolioHoldingUpdate(BaseModel):
+    quantity: Optional[float] = None
+    avg_buy_price: Optional[float] = None
+
+class PortfolioHoldingResponse(PortfolioHoldingBase):
+    id: UUID
+    user_id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class PortfolioSummary(BaseModel):
+    holdings: List[PortfolioHoldingResponse]
+    total_invested: float
 
 # ==================== Auth Schemas ====================
 

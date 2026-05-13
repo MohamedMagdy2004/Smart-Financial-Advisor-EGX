@@ -5,18 +5,212 @@ Updated to prioritize professional persona in chat reply.
 """
 import json
 import logging
+import os
+import re
 from typing import Any, Dict, Optional
 
 import requests
 
 from analyzer import analyze_news_batch, save_results
 from config import COMPANIES, GROQ_API_KEY, GROQ_MODEL
-from decision_engine import generate_final_decision
-from part2_generator import generate_part2_financial_json
+from decision_engine import QUERY_RESPONSE_RULES, _build_investor_profile_context, generate_final_decision
+from part2_generator import generate_part2_financial_json, _fetch_from_yfinance
 from scraper import scrape_news, validate_news_articles
 
 
 logger = logging.getLogger(__name__)
+
+
+
+
+def _known_tickers() -> set:
+    return {value[1] for value in COMPANIES.values()}
+
+
+def _load_latest_part2_snapshot(ticker: str) -> Optional[Dict[str, Any]]:
+    output_dir = os.environ.get("OUTPUT_DIR", "output")
+    prefix = f"{ticker.upper()}_part2_financial_"
+    try:
+        candidates = [
+            os.path.join(output_dir, name)
+            for name in os.listdir(output_dir)
+            if name.startswith(prefix) and name.endswith(".json")
+        ]
+    except Exception:
+        return None
+
+    if not candidates:
+        return None
+
+    latest = max(candidates, key=os.path.getmtime)
+    try:
+        with open(latest, "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+        return {"output_file": latest, "payload": payload}
+    except Exception:
+        return None
+
+
+def _extract_tickers_from_message(user_message: str) -> list:
+    text = user_message.upper()
+    tickers = []
+    for ticker in sorted(_known_tickers()):
+        if re.search(rf"\b{re.escape(ticker)}\b", text):
+            tickers.append(ticker)
+    return tickers
+
+
+def classify_query_type(user_message: str) -> str:
+    text = user_message.strip().lower()
+    tickers = _extract_tickers_from_message(user_message)
+
+    if not tickers:
+        return "GENERAL_CHAT"
+
+    comparison_markers = ["compare", "comparison", "vs", "versus", "مقارنة", "قارن", "بين"]
+    if len(tickers) >= 2 or any(marker in text for marker in comparison_markers):
+        return "COMPARISON"
+
+    # "What's the latest on X today?" should be QUICK_SUMMARY, not NEWS_ONLY.
+    quick_summary_priority_markers = ["إيه أخبار", "ايه اخبار", "what's up with", "how is"]
+    if any(marker in text for marker in quick_summary_priority_markers):
+        return "QUICK_SUMMARY"
+
+    news_markers = ["news", "news on", "any news", "أخبار", "خبر", "اخبار", "what's new", "what is new"]
+    if any(marker in text for marker in news_markers):
+        return "NEWS_ONLY"
+
+    simple_fact_markers = [
+        "price", "current price", "volume", "market open", "market close",
+        "when does market open", "when is market open", "opening time", "closing time",
+        "سعر", "حجم التداول", "افتتاح", "إغلاق", "يفتح", "يغلق", "كم السعر", "كم حجم"
+    ]
+    if any(marker in text for marker in simple_fact_markers):
+        return "SIMPLE_FACT"
+
+    quick_summary_markers = [
+        "how is", "how's", "is it up", "is it down", "up or down", "doing today",
+        "summary", "quick summary", "short summary", "أداء", "عامل", "ما الوضع", "ملخص"
+    ]
+    if any(marker in text for marker in quick_summary_markers):
+        return "QUICK_SUMMARY"
+
+    full_analysis_markers = [
+        "analyze", "analyse", "analysis", "report", "should i buy", "should i sell",
+        "buy", "sell", "recommend", "recommendation", "technical", "fundamental",
+        "حلل", "تحليل", "تقرير", "أنصح", "أشتري", "اشتري", "بيع", "توصية"
+    ]
+    if any(marker in text for marker in full_analysis_markers):
+        return "FULL_ANALYSIS"
+
+    return "FULL_ANALYSIS"
+
+
+def _format_simple_fact_reply(ticker: str, user_message: str) -> str:
+    text = user_message.lower()
+    if any(marker in text for marker in ["market open", "when does market open", "when is market open", "افتتاح", "يفتح"]):
+        return "The EGX market usually opens in the morning session; check the exchange schedule for the exact session time today."
+
+    df = _fetch_from_yfinance(ticker, from_date="2024-01-01")
+    if df is None or df.empty:
+        return f"I couldn't fetch a live quote for {ticker} right now."
+
+    latest = df.iloc[-1]
+    price = float(latest.get("Close", 0.0))
+    volume = int(latest.get("Volume", 0) or 0)
+    return f"{ticker} is trading at {price:.2f} EGP today with volume around {volume:,} shares."
+
+
+def _format_quick_summary_reply(decision_result: Dict[str, Any], ticker: str) -> str:
+    result = decision_result.get("result", decision_result)
+    translator = result.get("decision_translator", {})
+    stock_analysis = str(result.get("stock_analysis", "")).strip()
+    simple_reason = str(translator.get("simple_reason", "")).strip()
+    recommendation = str(translator.get("buy_or_not", "HOLD")).strip()
+    lines = [
+        f"{ticker} quick summary:",
+        stock_analysis[:180] if stock_analysis else f"Recommendation: {recommendation}",
+        f"Signal: {recommendation}",
+    ]
+    if simple_reason:
+        lines.append(simple_reason[:180])
+    return "\n".join(lines[:4])
+
+
+def _format_news_only_reply(articles: list, ticker: str) -> str:
+    if not articles:
+        return f"No recent news items were found for {ticker}."
+
+    bullets = []
+    for item in articles[:5]:
+        headline = item.get("headline") or item.get("title") or item.get("short_summary") or "News item"
+        bullets.append(f"- {headline}")
+    return f"Recent news for {ticker}:\n" + "\n".join(bullets)
+
+
+def _format_comparison_reply(first_result: Dict[str, Any], second_result: Dict[str, Any], first_ticker: str, second_ticker: str) -> str:
+    first_company = (first_result.get("payload") or {}).get("companies", [{}])[0]
+    second_company = (second_result.get("payload") or {}).get("companies", [{}])[0]
+    first_price = (first_company.get("price") or {}).get("current_EGP")
+    second_price = (second_company.get("price") or {}).get("current_EGP")
+    first_signal = first_company.get("signal", "N/A")
+    second_signal = second_company.get("signal", "N/A")
+    return (
+        f"{first_ticker} vs {second_ticker}\n"
+        f"- {first_ticker}: price={first_price}, signal={first_signal}\n"
+        f"- {second_ticker}: price={second_price}, signal={second_signal}"
+    )
+
+
+def _format_full_analysis_reply(ticker: str, decision_result: Dict[str, Any], chat_history: Optional[list] = None) -> str:
+    result = decision_result.get("result", {})
+    translator = result.get("decision_translator", {})
+
+    def clean_llm_text(text):
+        if not text:
+            return ""
+        text = re.sub(r'```json.*?```', '', text, flags=re.DOTALL)
+        text = re.sub(r'\{.*?"stock_analysis".*?\}', '', text, flags=re.DOTALL)
+        tags_to_remove = ["### stock_analysis", "### advanced_explanation", "### اربط الأخبار بالواقع"]
+        for tag in tags_to_remove:
+            text = text.replace(tag, "")
+        return text.strip()
+
+    analysis = clean_llm_text(result.get("stock_analysis", ""))
+    advanced = clean_llm_text(result.get("advanced_explanation", ""))
+    scenarios = result.get("scenario_analysis", [])
+    recommendations = translator.get("clear_recommendations", [])
+    warning = clean_llm_text(result.get("risk_warning", ""))
+
+    detailed_content = f"📊 **التحليل الفني والأساسي:**\n{analysis}\n\n"
+    if advanced and advanced[:100] != analysis[:100]:
+        detailed_content += f"💡 **رؤية الخبراء والمستويات الرقمية:**\n{advanced}\n\n"
+
+    if scenarios and isinstance(scenarios, list):
+        detailed_content += "🎯 **السيناريوهات المتوقعة:**\n"
+        for s in scenarios:
+            if isinstance(s, dict):
+                detailed_content += f"- {s.get('scenario', '')}: **{s.get('action', '')}** ({s.get('reason', '')})\n"
+
+    if recommendations and isinstance(recommendations, list):
+        detailed_content += "\n✅ **توصيات إضافية:**\n"
+        filtered_recs = [r for r in recommendations if "detailed analysis" not in r.lower()]
+        if filtered_recs:
+            detailed_content += "\n".join([f"- {r}" for r in filtered_recs])
+
+    if warning:
+        detailed_content += f"\n\n⚠️ **تحذير المخاطر:**\n{warning}"
+
+    is_first_interaction = not chat_history or len(chat_history) < 2
+
+    if is_first_interaction:
+        identity_intro = (
+            "أنا المستشار المالي الذكي للبورصة المصرية، مشروع تخرج تم تطويره "
+            "بواسطة طلاب كلية الذكاء الاصطناعي.\n\n"
+        )
+        return f"{identity_intro}🔍 **نتائج تحليل سهم {ticker}:**\n\n{detailed_content}"
+
+    return f"🔍 **نتائج تحليل سهم {ticker}:**\n\n{detailed_content}"
 
 
 def _companies_for_prompt() -> list:
@@ -24,6 +218,8 @@ def _companies_for_prompt() -> list:
         {"name_ar": value[0], "ticker": value[1]}
         for value in COMPANIES.values()
     ]
+
+
 
 
 def _fallback_match_ticker(user_message: str) -> Optional[str]:
@@ -65,6 +261,8 @@ def infer_ticker_from_message(user_message: str) -> Dict[str, Any]:
             "temperature": 0.0,
             "messages": [
                 {"role": "system", "content": system_prompt},
+
+
                 {"role": "user", "content": user_prompt},
             ],
         },
@@ -78,6 +276,8 @@ def infer_ticker_from_message(user_message: str) -> Dict[str, Any]:
     except json.JSONDecodeError:
         if fallback:
             return {"ticker": fallback, "reason": "fallback_after_bad_json", "confidence": 0.55}
+
+
         raise RuntimeError("Ticker inference model output was not valid JSON")
 
     ticker = str(parsed.get("ticker", "")).upper().strip()
@@ -94,11 +294,15 @@ def infer_ticker_from_message(user_message: str) -> Dict[str, Any]:
     }
 
 
+
+
 def _company_name_from_ticker(ticker: str) -> str:
     for _, (name_ar, symbol) in COMPANIES.items():
         if symbol == ticker.upper():
             return name_ar
     raise RuntimeError(f"Unknown ticker: {ticker}")
+
+
 
 
 def _is_general_chat(user_message: str) -> bool:
@@ -109,10 +313,10 @@ def _is_general_chat(user_message: str) -> bool:
     """
     msg = user_message.lower().strip()
     
-    import re
-    
     # 1. Explicit ticker mention (4-letter code in caps) = NOT general chat
     if re.search(r'\b[A-Z]{4}\b', user_message):
+
+
         return False
     
     # 2. Explicit financial action verbs = NOT general chat
@@ -179,10 +383,12 @@ def run_chat_pipeline(
     max_news: int = 20,
     chat_history: Optional[list] = None,
 ) -> Dict[str, Any]:
+    query_type = classify_query_type(user_message)
     if _is_general_chat(user_message):
         general_reply = run_general_chat(user_message, chat_history)
         return {
             "ticker": "GENERAL",
+            "query_type": "GENERAL_CHAT",
             "chat_reply": general_reply,
             "final_result": {"status": "chat_only"},
             # بنبعت دول فاضيين عشان الـ Frontend ميعرضش "جاري تشغيل الـ Pipeline"
@@ -193,6 +399,81 @@ def run_chat_pipeline(
     ticker = inferred["ticker"]
     company_name = _company_name_from_ticker(ticker)
 
+    if query_type == "SIMPLE_FACT":
+        fact_reply = _format_simple_fact_reply(ticker, user_message)
+        return {
+            "ticker_inference": inferred,
+            "ticker": ticker,
+            "query_type": query_type,
+            "chat_reply": fact_reply,
+            "final_result": {"status": "simple_fact", "query_type": query_type},
+            "part1_news_output": None,
+            "part2_financial_output": None,
+        }
+
+    if query_type == "NEWS_ONLY":
+        raw_articles = scrape_news(ticker, company_name, max_news=max_news)
+        articles = validate_news_articles(raw_articles)
+        if not articles:
+            raise RuntimeError(f"No news scraped for ticker {ticker}")
+        analyzed_news = analyze_news_batch(articles)
+        news_path = save_results(analyzed_news, ticker)
+        return {
+            "ticker_inference": inferred,
+            "ticker": ticker,
+            "query_type": query_type,
+            "chat_reply": _format_news_only_reply(analyzed_news, ticker),
+            "final_result": {"status": "news_only", "query_type": query_type},
+            "part1_news_output": news_path,
+            "part2_financial_output": None,
+        }
+
+    if query_type == "QUICK_SUMMARY":
+        try:
+            part2 = generate_part2_financial_json(
+                ticker=ticker,
+                user_risk_profile=user_risk_profile or "moderate",
+                drawdown_tolerance=(risk_answers or {}).get("max_drawdown_tolerance"),
+            )
+        except Exception:
+            part2 = _load_latest_part2_snapshot(ticker)
+            if not part2:
+                raise
+        return {
+            "ticker_inference": inferred,
+            "ticker": ticker,
+            "query_type": query_type,
+            "chat_reply": _format_quick_summary_reply(part2, ticker),
+            "final_result": {"status": "quick_summary", "query_type": query_type, "result": part2.get("payload")},
+            "part1_news_output": None,
+            "part2_financial_output": part2.get("output_file"),
+        }
+
+    if query_type == "COMPARISON":
+        tickers = _extract_tickers_from_message(user_message)
+        if len(tickers) < 2:
+            tickers = [ticker, ticker]
+        first_ticker, second_ticker = tickers[:2]
+        first_result = generate_part2_financial_json(
+            ticker=first_ticker,
+            user_risk_profile=user_risk_profile or "moderate",
+            drawdown_tolerance=(risk_answers or {}).get("max_drawdown_tolerance"),
+        )
+        second_result = generate_part2_financial_json(
+            ticker=second_ticker,
+            user_risk_profile=user_risk_profile or "moderate",
+            drawdown_tolerance=(risk_answers or {}).get("max_drawdown_tolerance"),
+        )
+        return {
+            "ticker_inference": inferred,
+            "ticker": ticker,
+            "query_type": query_type,
+            "chat_reply": _format_comparison_reply(first_result, second_result, first_ticker, second_ticker),
+            "final_result": {"status": "comparison", "query_type": query_type},
+            "part1_news_output": None,
+            "part2_financial_output": [first_result.get("output_file"), second_result.get("output_file")],
+        }
+
     raw_articles = scrape_news(ticker, company_name, max_news=max_news)
     articles = validate_news_articles(raw_articles)
     if not articles:
@@ -201,10 +482,16 @@ def run_chat_pipeline(
     analyzed_news = analyze_news_batch(articles)
     news_path = save_results(analyzed_news, ticker)
 
-    part2 = generate_part2_financial_json(
-        ticker=ticker,
-        user_risk_profile=user_risk_profile or "moderate",
-    )
+    try:
+        part2 = generate_part2_financial_json(
+            ticker=ticker,
+            user_risk_profile=user_risk_profile or "moderate",
+            drawdown_tolerance=(risk_answers or {}).get("max_drawdown_tolerance"),
+        )
+    except Exception:
+        part2 = _load_latest_part2_snapshot(ticker)
+        if not part2:
+            raise
     financial_path = part2["output_file"]
 
     final_decision = generate_final_decision(
@@ -213,73 +500,29 @@ def run_chat_pipeline(
         financial_json_path=financial_path,
         user_risk_profile=user_risk_profile,
         risk_answers=risk_answers,
+        query_type=query_type,
+        query_text=user_message,
     )
+    chat_reply = _format_full_analysis_reply(ticker, final_decision, chat_history)
 
     decision_result = final_decision.get("result", {})
-    translator = decision_result.get("decision_translator", {})
-
-
-
-    # 1. استخراج كل الحقول من نتيجة الـ AI
-    # --- بداية التعديل المطور للتنظيف ومنع التكرار ---
-
-    # دالة داخلية لتنظيف النص من أي مخلفات تقنية أو JSON بيغلط فيها الـ AI
-    def clean_llm_text(text):
-        if not text: return ""
-        # حذف أي بلوكات كود JSON لو الموديل كتبها غلط جوه النص
-        text = re.sub(r'```json.*?```', '', text, flags=re.DOTALL)
-        text = re.sub(r'\{.*?"stock_analysis".*?\}', '', text, flags=re.DOTALL)
-        # حذف العناوين الجانبية اللي الموديل بيكررها
-        tags_to_remove = ["### stock_analysis", "### advanced_explanation", "### اربط الأخبار بالواقع"]
-        for tag in tags_to_remove:
-            text = text.replace(tag, "")
-        return text.strip()
-
-    import re
-    analysis = clean_llm_text(decision_result.get("stock_analysis", ""))
-    advanced = clean_llm_text(decision_result.get("advanced_explanation", ""))
-    scenarios = decision_result.get("scenario_analysis", [])
-    recommendations = translator.get("clear_recommendations", [])
-    warning = clean_llm_text(decision_result.get("risk_warning", ""))
-
-    detailed_content = f"📊 **التحليل الفني والأساسي:**\n{analysis}\n\n"
-
-
-    if advanced and advanced[:100] != analysis[:100]:
-        detailed_content += f"💡 **رؤية الخبراء والمستويات الرقمية:**\n{advanced}\n\n"
-
-    if scenarios and isinstance(scenarios, list):
-        detailed_content += "🎯 **السيناريوهات المتوقعة:**\n"
-        for s in scenarios:
-            if isinstance(s, dict):
-                detailed_content += f"- {s.get('scenario', '')}: **{s.get('action', '')}** ({s.get('reason', '')})\n"
-
-    if recommendations and isinstance(recommendations, list):
-        detailed_content += "\n✅ **توصيات إضافية:**\n"
-        filtered_recs = [r for r in recommendations if "detailed analysis" not in r.lower()]
-        if filtered_recs:
-            detailed_content += "\n".join([f"- {r}" for r in filtered_recs])
-
-    if warning:
-        detailed_content += f"\n\n⚠️ **تحذير المخاطر:**\n{warning}"
-
-
-
-    is_first_interaction = not chat_history or len(chat_history) < 2
-
-    if is_first_interaction:
-        identity_intro = (
-            "أنا المستشار المالي الذكي للبورصة المصرية، مشروع تخرج تم تطويره "
-            "بواسطة طلاب كلية الذكاء الاصطناعي.\n\n"
-        )
-        chat_reply = f"{identity_intro}🔍 **نتائج تحليل سهم {ticker}:**\n\n{detailed_content}"
-    else:
-        chat_reply = f"🔍 **نتائج تحليل سهم {ticker}:**\n\n{detailed_content}"
+    if isinstance(decision_result, dict):
+        investor_profile_block = ((final_decision.get("prompt_debug") or {}).get("investor_profile") or {}).get("block")
+        if not investor_profile_block:
+            financial_company = (part2.get("payload") or {}).get("companies", [{}])[0]
+            investor_profile_block = _build_investor_profile_context(
+                user_risk_profile or "moderate",
+                risk_answers,
+                financial_company,
+            ).get("block")
+        if investor_profile_block:
+            decision_result.setdefault("investor_profile_block", investor_profile_block)
 
 
     return {
         "ticker_inference": inferred,
         "ticker": ticker,
+        "query_type": query_type,
         "chat_reply": chat_reply,  # الرد المفلتر والمنظم
         "final_result": decision_result,
         "part1_news_output": news_path,

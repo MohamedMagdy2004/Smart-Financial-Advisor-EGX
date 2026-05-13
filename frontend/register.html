@@ -12,14 +12,17 @@
         }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #0b132b 0%, #1c2541 40%, #280875 100%);
+            font-family: 'Cairo', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #071028 0%, #101727 45%, #1a0833 100%);
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
             position: relative;
             overflow: hidden;
+            color: #E6EEF8;
+            font-size:16px;
+            line-height:1.45;
         }
 
         body::before {
@@ -43,7 +46,7 @@
         }
 
         .register-card {
-            background: rgba(10, 14, 39, 0.8);
+            background: rgba(8, 12, 30, 0.78);
             backdrop-filter: blur(20px);
             border-radius: 24px;
             padding: 40px 35px;
@@ -73,7 +76,8 @@
         }
 
         .logo h1 {
-            font-size: 22px;
+            font-size: 24px;
+            font-weight:700;
             background: linear-gradient(135deg, #fff, #00d4ff);
             -webkit-background-clip: text;
             background-clip: text;
@@ -99,13 +103,13 @@
 
         .input-group input {
             width: 100%;
-            padding: 10px 13px;
-            background: rgba(0, 0, 0, 0.5);
-            border: 2px solid rgba(0, 212, 255, 0.3);
+            padding: 12px 14px;
+            background: rgba(3,10,20,0.6);
+            border: 1px solid rgba(10,90,160,0.12);
             border-radius: 12px;
-            color: #fff;
-            font-size: 14px;
-            transition: all 0.3s;
+            color: #E6EEF8;
+            font-size: 15px;
+            transition: all 0.18s;
         }
 
         .input-group input:focus {
@@ -120,16 +124,17 @@
 
         .register-btn {
             width: 100%;
-            padding: 10px;
-            background: linear-gradient(135deg, #00d4ff, #0066ff);
+            padding: 12px;
+            background: linear-gradient(135deg, #06b6d4, #065fcb);
             border: none;
             border-radius: 12px;
             color: #fff;
             font-size: 16px;
-            font-weight: bold;
+            font-weight: 700;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.18s;
             margin-top: 10px;
+            box-shadow: 0 8px 22px rgba(3,12,30,0.45);
         }
 
         .register-btn:hover {
