@@ -10,7 +10,10 @@
 ## الملفات المهمة
 
 - [backend/app.py](backend/app.py)
-- [frontend/index.html](frontend/index.html)
+- [frontend/index.html](frontend/index.html) - الصفحة الرئيسية (لوحة التحكم)
+- [frontend/login.html](frontend/login.html) - صفحة تسجيل الدخول
+- [frontend/register.html](frontend/register.html) - صفحة التسجيل
+- [frontend/dashboard.html](frontend/dashboard.html) - لوحة المعلومات
 - [modal_functions/ai_model.py](modal_functions/ai_model.py)
 - [backend/.env.example](backend/.env.example)
 
@@ -48,12 +51,18 @@ python -m uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 
 ```bash
 cd frontend
-python -m http.server 3000
+python server.py
 ```
+
+> أو استخدم الطريقة القديمة: `python -m http.server 3000`
 
 ### 3) افتح الواجهة
 
-- http://localhost:3000
+الصفحات المتاحة:
+- **الرئيسية**: http://localhost:3000 ⭐
+- **تسجيل الدخول**: http://localhost:3000/login.html
+- **التسجيل**: http://localhost:3000/register.html
+- **لوحة التحكم**: http://localhost:3000/dashboard.html
 
 ## ملاحظات مهمة
 
