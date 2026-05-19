@@ -1,9 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EGX AI Bot - Login</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>EGX AI Platform | Financial Market Intelligence</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -12,256 +15,568 @@
         }
 
         body {
-            font-family: 'Cairo', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #071028 0%, #101727 45%, #1a0833 100%);
+            background: linear-gradient(135deg, #0b132b 0%, #1c2541 40%, #280875 100%);
+            font-family: 'Inter', sans-serif;
+            color: #eef2ff;
+            padding: 16px;
             min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-            overflow: hidden;
-            color: #E6EEF8;
-            font-size:16px;
-            line-height:1.5;
         }
 
-        /* Neural network background */
-        body::before {
-            content: '';
-            position: absolute;
+        /* Neural Background Canvas Container */
+        .neural-bg {
+            position: fixed;
             width: 100%;
             height: 100%;
-            background-image: 
-                linear-gradient(rgba(0, 255, 255, 0.03) 2px, transparent 2px),
-                linear-gradient(90deg, rgba(0, 255, 255, 0.03) 2px, transparent 2px);
-            background-size: 50px 50px;
-            pointer-events: none;
+            top: 0;
+            left: 0;
+            z-index: 1; /* جعلها فوق الخلفية الملونة مباشرة وتحت المحتوى */
+            overflow: hidden;
+            pointer-events: none; /* لمنع حجب الضغطات عن الأزرار والروابط */
         }
 
-        .container {
+        .neuron {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: rgba(0, 212, 255, 0.6);
+            border-radius: 70%;
+            box-shadow: 0 0 12px rgba(0, 212, 255, 0.8);
+            animation: pulse 3s infinite ease-in-out;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.1; transform: scale(0.8); }
+            50% { opacity: 0.9; transform: scale(1.4); }
+        }
+
+        /* Main dashboard grid */
+        .dashboard {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 16px;
             position: relative;
-            z-index: 2;
-            width: 100%;
-            max-width: 450px;
-            padding: 20px;
+            z-index: 5; /* رفع طبقة الواجهة الأمامية لتبرز فوق جزيئات النيورون */
         }
 
-        .login-card {
-            background: rgba(8, 12, 30, 0.78);
-            backdrop-filter: blur(20px);
-            border-radius: 24px;
-            padding: 40px 35px;
-            border: 1px solid rgba(0, 255, 255, 0.2);
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-            transition: all 0.3s;
+        /* =========== LEFT SIDEBAR (Glassmorphism Style) ========== */
+        .sidebar {
+            background: rgba(15, 23, 42, 0.55);
+            border-radius: 20px;
+            padding: 18px 14px;
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            height: fit-content;
+            position: sticky;
+            top: 16px;
+            transition: all 0.3s ease;
+        }
+        
+        .sidebar:hover {
+            border-color: rgba(0, 212, 255, 0.4);
+            box-shadow: 0 0 30px rgba(0, 212, 255, 0.15);
         }
 
-        .logo {
-            text-align: center;
-            margin-bottom: 35px;
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
         }
 
-        .logo-icon {
-            width: 50px;
-            height: 50px;
-            background: linear-gradient(135deg, #00d4ff, #0066ff);
-            border-radius: 18px;
+        .bot-img-container {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid rgba(0, 212, 255, 0.4);
+            box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
+            overflow: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 15px;
-            font-size: 14px;
-            font-weight: bold;
-            color: #fff;
-            box-shadow: 0 0 30px rgba(0, 212, 255, 0.3);
         }
 
-        .logo h1 {
-            font-size: 26px;
-            font-weight:700;
-            background: linear-gradient(135deg, #fff, #00d4ff);
+        .bot-img-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .logo-text h2 {
+            font-size: 1.15rem;
+            font-weight: 700;
+            background: linear-gradient(120deg, #ffffff, #00d4ff);
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
-            letter-spacing:0.2px;
-        }
-         .logo p {
-            font-size: 12px;
-            color: #a0aec0;
-            margin-top: 5px;
         }
 
-        .input-group {
+        .logo-text p {
+            font-size: 10px;
+            color: #8da2bb;
+        }
+
+        /* User Info Component */
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(11, 15, 23, 0.6);
+            padding: 10px 12px;
+            border-radius: 30px;
             margin-bottom: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
-        .input-group label {
-            display: block;
-            font-size: 13px;
-            color: #a0aec0;
-            margin-bottom: 8px;
+        .avatar {
+            background: #2c3e66;
+            border-radius: 50%;
+            width: 34px;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            color: #00d4ff;
         }
 
-        .input-group input {
-            width: 100%;
-            padding: 14px 16px;
-            background: rgba(3,10,20,0.6);
-            border: 1px solid rgba(10,90,160,0.12);
-            border-radius: 12px;
-            color: #E6EEF8;
-            font-size: 15px;
-            transition: all 0.2s;
+        .user-details h4 {
+            font-size: 0.85rem;
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
-        .input-group input:focus {
-            outline: none;
-            border-color: #00d4ff;
-            box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
+        .user-details span {
+            font-size: 11px;
+            color: #7e8aa8;
         }
 
-        .input-group input::placeholder {
-            color: rgba(255, 255, 255, 0.25);
+        .logout-icon {
+            margin-left: auto;
+            color: #f05e5e;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        /* Login Button Container */
+        .login-area {
+            margin: 16px 0 20px 0;
         }
 
         .login-btn {
-            width: 100%;
-            padding: 14px;
-            background: linear-gradient(135deg, #06b6d4, #065fcb);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: linear-gradient(95deg, #0066ff, #00d4ff);
             border: none;
-            border-radius: 12px;
-            color: #fff;
-            font-size: 16px;
-            font-weight: 700;
+            width: 100%;
+            padding: 11px 0;
+            border-radius: 30px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: white;
             cursor: pointer;
-            transition: all 0.18s;
-            margin-top: 10px;
-            box-shadow: 0 8px 22px rgba(3,12,30,0.45);
+            transition: all 0.2s ease;
+            text-decoration: none;
+            box-shadow: 0 4px 12px rgba(0, 102, 255, 0.25);
         }
 
         .login-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.3);
+            transform: translateY(-1px);
+            background: linear-gradient(95deg, #3e96ff, #1fd4b0);
+            box-shadow: 0 6px 18px rgba(0, 212, 255, 0.35);
         }
 
-        .register-link {
-            text-align: center;
-            margin-top: 25px;
-            font-size: 14px;
+        /* Risk Engine, Watchlist, Portfolio Unified Cards */
+        .risk-engine, .watchlist, .portfolio {
+            background: rgba(15, 23, 42, 0.45);
+            border-radius: 15px;
+            padding: 14px;
+            margin: 12px 0;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(8px);
+            transition: all 0.3s ease;
+        }
+
+        .risk-engine:hover, .watchlist:hover, .portfolio:hover {
+            border-color: rgba(0, 212, 255, 0.3);
+            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.1);
+        }
+
+        .risk-engine {
+            border-right: 3px solid #00c48c;
+            text-align: left;
+            font-size: 0.8rem;
+        }
+
+        .live-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 6px;
+            font-size: 11px;
             color: #a0aec0;
         }
 
-        .register-link a {
-            color: #00d4ff;
-            text-decoration: none;
+        .watchlist h4, .portfolio h4 {
+            font-size: 0.8rem;
+            margin-bottom: 10px;
+            color: #b9c7e3;
             font-weight: 600;
-            transition: all 0.3s;
+            letter-spacing: 0.5px;
         }
 
-        .register-link a:hover {
-            text-decoration: underline;
-            color: #00ff88;
+        .stock-item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         }
 
-        .error-message {
-            background: rgba(255, 68, 68, 0.2);
-            border: 1px solid rgba(255, 68, 68, 0.5);
-            border-radius: 10px;
-            padding: 10px;
-            margin-bottom: 20px;
-            font-size: 13px;
-            color: #ff8888;
-            text-align: center;
-            display: none;
+        .stock-item:last-child {
+            border-bottom: none;
         }
 
-        .footer {
-            text-align: center;
-            margin-top: 20px;
+        .positive { color: #2ecc71; }
+        .negative { color: #f87171; }
+
+        /* =========== MAIN CONTENT AREA ========== */
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .project-bio {
+            background: rgba(15, 23, 42, 0.55);
+            border-radius: 20px;
+            padding: 22px 24px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(14px);
+        }
+
+        .project-bio h1 {
+            font-size: 1.6rem;
+            background: linear-gradient(to left, #ffffff, #00d4ff);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: 8px;
+        }
+
+        .project-bio p {
+            font-size: 0.85rem;
+            margin: 10px 0;
+            line-height: 1.5;
+            color: #b9c7e3;
+        }
+
+        .badge-ai {
+            background: rgba(0, 212, 255, 0.06);
+            padding: 6px 14px;
+            border-radius: 20px;
             font-size: 11px;
-            color: rgba(160, 174, 192, 0.5);
+            display: inline-block;
+            margin-top: 6px;
+            border: 1px solid rgba(0, 212, 255, 0.15);
+            color: #00d4ff;
+        }
+
+        /* Indices Row */
+        .indices-row {
+            background: rgba(15, 23, 42, 0.55);
+            border-radius: 20px;
+            padding: 14px;
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(14px);
+        }
+
+        .index-card {
+            background: rgba(11, 15, 25, 0.6);
+            border-radius: 14px;
+            padding: 10px 16px;
+            flex: 1;
+            min-width: 130px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.02);
+        }
+
+        .index-name {
+            font-size: 12px;
+            color: #8fa1c3;
+        }
+
+        .index-value {
+            font-size: 1.35rem;
+            font-weight: 700;
+            margin: 4px 0;
+        }
+
+        .index-card .positive, .index-card .negative {
+            font-size: 11px;
+        }
+
+        /* Charts Grid */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .chart-card {
+            background: rgba(15, 23, 42, 0.55);
+            border-radius: 20px;
+            padding: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(14px);
+        }
+
+        .chart-card h4 {
+            font-size: 0.85rem;
+            color: #eef2ff;
+            margin-bottom: 12px;
+        }
+
+        canvas {
+            max-height: 180px;
+            width: 100%;
+        }
+
+        /* Stocks Table Styling */
+        .stocks-table {
+            background: rgba(15, 23, 42, 0.55);
+            border-radius: 20px;
+            padding: 18px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(14px);
+        }
+
+        .stocks-table h3 {
+            margin-bottom: 14px;
+            font-size: 1rem;
+            color: #eef2ff;
+        }
+
+        .stocks-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .stocks-table th {
+            font-size: 12px;
+            color: #7e8aa8;
+            font-weight: 500;
+            padding: 10px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stocks-table td {
+            padding: 12px 10px;
+            font-size: 13px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        @media (max-width: 1000px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+            .sidebar {
+                position: static;
+            }
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="login-card">
-            <div class="logo">
-                <div class="logo-img">
-                    <img src="Chat bot logo.jpg" alt="EGX AI Bot" style="width: 45%; height: 45%; object-fit: cover; border-radius: 100px;">
+    <div class="neural-bg" id="neuralBg"></div>
+    
+    <div class="dashboard">
+        <div class="sidebar">
+            <div class="logo-area">
+                <div class="bot-img-container">
+                    <img src="Chat bot logo.jpg" alt="EGX AI Bot">
                 </div>
-                <h1>EGX AI FINANCIAL BOT</h1>
-                <p>Egyptian Stock Exchange Intelligence</p>
+                <div class="logo-text">
+                    <h2>EGX AI BOT</h2>
+                    <p>Active • Market Intelligence</p>
+                </div>
             </div>
 
-            <div class="error-message" id="errorMessage">Invalid username or password</div>
-
-            <form id="loginForm">
-                <div class="input-group">
-                    <label>Email</label>
-                    <input type="email" id="username" placeholder="Enter your email" required>
+            <div class="user-info" id="userPanel">
+                <div class="avatar" id="userAvatar"><i class="fas fa-user"></i></div>
+                <div class="user-details">
+                    <h4 id="userTitle">Guest User</h4>
+                    <span id="userStatus">Not logged in</span>
                 </div>
-                <div class="input-group">
-                    <label>Password</label>
-                    <input type="password" id="password" placeholder="Enter your password" required>
-                </div>
-                <button type="submit" class="login-btn">🔐 Login</button>
-            </form>
-
-            <div class="register-link">
-                Don't have an account? <a href="register.html">Register</a>
+                <div class="logout-icon" id="sessionActionBtn" title="Login"><i class="fas fa-lock"></i></div>
             </div>
-            <div class="footer">
-                EGX AI Bot v1.0
+
+            <div class="login-area">
+                <a href="login.html" class="login-btn" id="mainActionBtn">
+                    <i class="fas fa-arrow-right-to-bracket"></i> Login to Chatbot
+                </a>
+            </div>
+
+            <div class="risk-engine">
+                <div style="font-weight:600; color:#b9c7e3; margin-bottom:8px;"><i class="fas fa-shield-alt"></i> IG RISK ENGINE</div>
+                <div class="live-indicator"><span>MARKET</span> <span>LIVE</span></div>
+                <div class="live-indicator"><span>VOLATILITY</span> <span>MEDIUM</span></div>
+                <div class="live-indicator"><span>SENTIMENT</span> <span class="positive">BULLISH</span></div>
+            </div>
+
+            <div class="watchlist">
+                <h4><i class="fas fa-star"></i> MY WATCHLIST</h4>
+                <div class="stock-item"><span>COMI</span><span class="positive">▲ 82.45 EGP</span></div>
+                <div class="stock-item"><span>SWDY</span><span class="positive">▲ 89.15 EGP</span></div>
+                <div class="stock-item"><span>TMGH</span><span class="negative">▼ 18.30 EGP</span></div>
+                <div class="stock-item"><span>ABUK</span><span class="positive">▲ 63.20 EGP</span></div>
+            </div>
+
+            <div class="portfolio">
+                <h4><i class="fas fa-chart-line"></i> MY PORTFOLIO</h4>
+                <div class="stock-item"><span>Total Value</span><span>189,240 EGP</span></div>
+                <div class="stock-item"><span>Today P&L</span><span class="positive">+2,340 EGP</span></div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="project-bio">
+                <h1>🤖 EGX AI Financial Analyst</h1>
+                <p>An intelligent assistant specialized in analyzing Egyptian Exchange (EGX) stocks using advanced AI models. The platform provides real-time insights, technical charts, live market indices, and stock screening — inspired by platforms like TradingView. Click the "Login to Chatbot" button to access the AI-powered chat interface for personalized stock recommendations and market Q&A.</p>
+                <div class="badge-ai"><i class="fas fa-chart-simple"></i> Technical Analysis | Live Data | AI Predictions | EGX Focus</div>
+            </div>
+
+            <div class="indices-row">
+                <div class="index-card"><div class="index-name">EGX 30</div><div class="index-value">29,871.42</div><div class="positive">▲ +1.2%</div></div>
+                <div class="index-card"><div class="index-name">EGX 70 EWI</div><div class="index-value">6,245.18</div><div class="positive">▲ +0.8%</div></div>
+                <div class="index-card"><div class="index-name">EGX 100</div><div class="index-value">10,523.90</div><div class="negative">▼ -0.3%</div></div>
+                <div class="index-card"><div class="index-name">EGX 30 Cap</div><div class="index-value">38,222.55</div><div class="positive">▲ +1.5%</div></div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h4>COMI | Commercial International Bank <span style="float:right; font-size:11px; color:#7e8aa8;">30 days</span></h4>
+                    <canvas id="comChart" width="400" height="180"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h4>SWDY | Elsewedy Electric <span style="float:right; font-size:11px; color:#7e8aa8;">Trend</span></h4>
+                    <canvas id="swdyChart" width="400" height="180"></canvas>
+                </div>
+            </div>
+            
+            <div class="stocks-table">
+                <h3><i class="fas fa-list-ul"></i> Egyptian Stock Leaders - Live Prices (EGX)</h3>
+                <table>
+                    <thead>
+                        <tr><th style="text-align: left;">Company</th><th style="text-align: right;">Price (EGP)</th><th style="text-align: right;">Change %</th><th style="text-align: right;">Volume</th><th style="text-align: right;">AI Signal</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td style="text-align: left; font-weight: 500;">COMI (CIB)</td><td style="text-align: right;">82.45</td><td style="text-align: right;" class="positive">▲ +2.30%</td><td style="text-align: right; color:#7e8aa8;">1.2M</td><td style="text-align: right;" class="positive">BUY</td></tr>
+                        <tr><td style="text-align: left; font-weight: 500;">SWDY (Elsewedy)</td><td style="text-align: right;">89.15</td><td style="text-align: right;" class="positive">▲ +1.75%</td><td style="text-align: right; color:#7e8aa8;">892k</td><td style="text-align: right;" class="positive">ACCUMULATE</td></tr>
+                        <tr><td style="text-align: left; font-weight: 500;">TMGH (Talaat Moustafa)</td><td style="text-align: right;">18.30</td><td style="text-align: right;" class="negative">▼ -0.85%</td><td style="text-align: right; color:#7e8aa8;">2.1M</td><td style="text-align: right; color:#8fa1c3;">NEUTRAL</td></tr>
+                        <tr><td style="text-align: left; font-weight: 500;">ABUK (Abu Qir)</td><td style="text-align: right;">63.20</td><td style="text-align: right;" class="positive">▲ +3.10%</td><td style="text-align: right; color:#7e8aa8;">305k</td><td style="text-align: right;" class="positive">STRONG BUY</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 
     <script>
-        document.getElementById('loginForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            
-            try {
-                const response = await fetch('http://localhost:8000/login', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        email: username,
-                        password: password
-                    })
-                });
-
-                const data = await response.json();
-
-                if (response.ok && data.user) {
-                    // Save current user session
-                    localStorage.setItem('egx_current_user', JSON.stringify({
-                        username: data.user.full_name,
-                        email: data.user.email,
-                        id: data.user.id
-                    }));
-                    // Redirect to dashboard
-                    window.location.href = 'dashboard.html';
-                } else {
-                    const errorMsg = document.getElementById('errorMessage');
-                    errorMsg.textContent = data.detail || 'Invalid email or password';
-                    errorMsg.style.display = 'block';
-                    setTimeout(() => {
-                        errorMsg.style.display = 'none';
-                    }, 3000);
-                }
-            } catch (error) {
-                const errorMsg = document.getElementById('errorMessage');
-                errorMsg.textContent = 'Cannot connect to server';
-                errorMsg.style.display = 'block';
-                setTimeout(() => {
-                    errorMsg.style.display = 'none';
-                }, 3000);
+        function createNeuralNetwork() {
+            const container = document.getElementById('neuralBg');
+            if (!container) return;
+            for (let i = 0; i < 45; i++) {
+                const neuron = document.createElement('div');
+                neuron.className = 'neuron';
+                neuron.style.left = Math.random() * 100 + '%';
+                neuron.style.top = Math.random() * 100 + '%';
+                neuron.style.animationDelay = Math.random() * 3 + 's';
+                neuron.style.animationDuration = 2 + Math.random() * 3 + 's';
+                container.appendChild(neuron);
             }
+        }
+
+        // ================= SESSION & INITIALIZATION ENGINE =================
+        document.addEventListener("DOMContentLoaded", function() {
+            // تشغيل دالة بناء الشبكة العصبية فور تحميل الصفحة بنجاح
+            createNeuralNetwork();
+
+            const currentUser = localStorage.getItem('egx_current_user');
+            if (currentUser) {
+                try {
+                    const user = JSON.parse(currentUser);
+                    document.getElementById('userTitle').textContent = user.username || 'User';
+                    document.getElementById('userStatus').textContent = user.email || 'Logged In';
+                    if(user.username) {
+                        document.getElementById('userAvatar').textContent = user.username.charAt(0).toUpperCase();
+                    }
+                    const mainBtn = document.getElementById('mainActionBtn');
+                    mainBtn.innerHTML = '<i class="fas fa-chart-pie"></i> Open Dashboard';
+                    mainBtn.href = 'dashboard.html';
+                    
+                    const sessionIcon = document.getElementById('sessionActionBtn');
+                    sessionIcon.innerHTML = '<i class="fas fa-sign-out-alt"></i>';
+                    sessionIcon.title = "Logout";
+                    sessionIcon.onclick = function() {
+                        localStorage.removeItem('egx_current_user');
+                        window.location.reload();
+                    };
+                } catch(e) { console.error(e); }
+            }
+        });
+
+        // ================= CHARTS ENGINE =================
+        const ctxCom = document.getElementById('comChart').getContext('2d');
+        new Chart(ctxCom, {
+            type: 'line',
+            data: {
+                labels: ['1 Oct', '5 Oct', '10 Oct', '15 Oct', '20 Oct', '25 Oct', '30 Oct'],
+                datasets: [{
+                    label: 'COMI (EGP)',
+                    data: [75.2, 77.8, 76.5, 80.1, 79.6, 81.8, 82.45],
+                    borderColor: '#0066ff',
+                    backgroundColor: 'rgba(0, 102, 255, 0.03)',
+                    fill: true,
+                    tension: 0.3,
+                    pointBackgroundColor: '#2ecc71',
+                    pointBorderColor: '#ffffff',
+                    borderWidth: 1.5
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: '#6c86a3', font: { size: 10 } } }, y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#6c86a3', font: { size: 10 } } } } }
+        });
+
+        const ctxSwdy = document.getElementById('swdyChart').getContext('2d');
+        new Chart(ctxSwdy, {
+            type: 'line',
+            data: {
+                labels: ['1 Oct', '6 Oct', '11 Oct', '16 Oct', '21 Oct', '26 Oct', 'Today'],
+                datasets: [{
+                    label: 'SWDY (EGP)',
+                    data: [84.2, 85.0, 84.9, 87.3, 88.1, 88.7, 89.15],
+                    borderColor: '#f1c40f',
+                    backgroundColor: 'rgba(241,196,15,0.02)',
+                    fill: true,
+                    tension: 0.2,
+                    pointBackgroundColor: '#f39c12',
+                    borderWidth: 1.5
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: '#6c86a3', font: { size: 10 } } }, y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#6c86a3', font: { size: 10 } } } } }
         });
     </script>
 </body>
