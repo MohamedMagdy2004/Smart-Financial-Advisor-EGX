@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Union
 from uuid import UUID
 
 # ==================== User Schemas ====================
@@ -41,7 +41,7 @@ class MessageBase(BaseModel):
     content: str
 
 class MessageCreate(MessageBase):
-    user_id: UUID
+    user_id: Union[UUID, str]
     llm_output: Optional[dict] = None
 
 class Message(MessageBase):
@@ -63,7 +63,7 @@ class WatchlistBase(BaseModel):
     ticker: str
 
 class WatchlistCreate(WatchlistBase):
-    user_id: UUID
+    user_id: Union[UUID, str]  # تم التعديل هنا ليقبل النص أو الـ UUID ليتوافق مع واجهتكِ
 
 class WatchlistResponse(WatchlistBase):
     id: UUID
@@ -81,9 +81,10 @@ class PortfolioHoldingBase(BaseModel):
     avg_buy_price: float
 
 class PortfolioHoldingCreate(PortfolioHoldingBase):
-    user_id: UUID
+    user_id: Union[UUID, str]  # تم التعديل هنا ليقبل النص أو الـ UUID ليتوافق مع واجهتكِ
 
 class PortfolioHoldingUpdate(BaseModel):
+    ticker: Optional[str] = None
     quantity: Optional[float] = None
     avg_buy_price: Optional[float] = None
 
@@ -99,14 +100,3 @@ class PortfolioHoldingResponse(PortfolioHoldingBase):
 class PortfolioSummary(BaseModel):
     holdings: List[PortfolioHoldingResponse]
     total_invested: float
-
-# ==================== Auth Schemas ====================
-
-# class LoginRequest(BaseModel):
-#     email: EmailStr
-#     password: str
-
-# class LoginResponse(BaseModel):
-#     access_token: str
-#     token_type: str
-#     user: User
