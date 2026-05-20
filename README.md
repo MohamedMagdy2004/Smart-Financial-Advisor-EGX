@@ -51,10 +51,7 @@ python -m uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 
 ```bash
 cd frontend
-python server.py
-```
-
-> أو استخدم الطريقة القديمة: `python -m http.server 3000`
+python -m http.server 3000
 
 ### 3) افتح الواجهة
 
