@@ -5,6 +5,8 @@ Uses AI model to extract financial information from articles
 import json
 import logging
 import os
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from config import OUTPUT_SCHEME, SYSTEM_MESSAGE, USE_MODAL, OUTPUT_DIR
 
@@ -170,30 +172,112 @@ def get_analyzer():
         return LocalAnalyzer()
 
 
-def analyze_news_batch(articles: list, analyzer=None) -> list:
+def analyze_news_batch(articles: list, analyzer=None, max_workers=None, parallel=True) -> list:
     """
-    Analyze multiple news articles
+    Analyze multiple news articles with optional parallel execution.
     
     Args:
         articles: List of news article dicts
         analyzer: Analyzer instance (uses default if None)
+        max_workers: Max concurrent workers for parallel execution. Default: min(len(articles), 5)
+        parallel: Enable parallel execution. Sequential if False or len(articles)==1
     
     Returns:
-        List of analyzed articles with extracted info
+        List of analyzed articles with extracted info (preserves order)
     """
     if not analyzer:
         analyzer = get_analyzer()
     
-    results = []
-    for i, article in enumerate(articles, 1):
-        try:
-            logger.info(f"Analyzing article {i}/{len(articles)}: {article['headline'][:50]}")
-            result = analyzer.analyze_article(article)
-            results.append(result)
-            logger.info(f"  ✓ {result.get('event_type', '?')} | {result.get('sentiment', '?')} | {result.get('impact_level', '?')}")
-        except Exception as e:
-            logger.error(f"Error analyzing article: {e}")
-            continue
+    if not articles:
+        return []
+    
+    # Determine parallelization strategy
+    should_parallelize = parallel and len(articles) > 1
+    if max_workers is None:
+        max_workers = min(len(articles), 5)
+    
+    start_time = time.time()
+    
+    if not should_parallelize:
+        # Sequential execution
+        logger.info(f"Processing {len(articles)} articles sequentially")
+        results = []
+        for i, article in enumerate(articles, 1):
+            try:
+                logger.info(f"Analyzing article {i}/{len(articles)}: {article['headline'][:50]}")
+                result = analyzer.analyze_article(article)
+                results.append(result)
+                logger.info(f"  ✓ {result.get('event_type', '?')} | {result.get('sentiment', '?')} | {result.get('impact_level', '?')}")
+            except Exception as e:
+                logger.error(f"Error analyzing article {i}: {e}")
+                # Append error result to maintain list structure
+                results.append({
+                    "company_name": article.get("company_name") or article.get("company"),
+                    "ticker": article.get("ticker"),
+                    "news_date": article.get("news_date") or article.get("date"),
+                    "headline": article.get("headline") or article.get("title"),
+                    "link": article.get("link") or article.get("url"),
+                    "scraped_at": article.get("scraped_at"),
+                    "error": str(e)
+                })
+    else:
+        # Parallel execution with ThreadPoolExecutor
+        logger.info(f"Processing {len(articles)} articles in parallel: parallel=True, max_workers={max_workers}")
+        
+        def analyze_one(index_article):
+            """Analyze a single article with index tracking"""
+            index, article = index_article
+            try:
+                logger.info(f"[Worker] Analyzing article {index + 1}/{len(articles)}: {article['headline'][:40]}")
+                result = analyzer.analyze_article(article)
+                return index, result
+            except Exception as e:
+                logger.error(f"[Worker] Error analyzing article {index + 1}: {e}")
+                return index, {
+                    "company_name": article.get("company_name") or article.get("company"),
+                    "ticker": article.get("ticker"),
+                    "news_date": article.get("news_date") or article.get("date"),
+                    "headline": article.get("headline") or article.get("title"),
+                    "link": article.get("link") or article.get("url"),
+                    "scraped_at": article.get("scraped_at"),
+                    "error": str(e)
+                }
+        
+        # Initialize result array with None placeholders to maintain order
+        ordered_results = [None] * len(articles)
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all tasks with index
+            futures = {
+                executor.submit(analyze_one, (i, article)): i 
+                for i, article in enumerate(articles)
+            }
+            
+            # Collect results as they complete, but maintain original order
+            completed = 0
+            for future in as_completed(futures):
+                try:
+                    index, result = future.result()
+                    ordered_results[index] = result
+                    completed += 1
+                    logger.info(f"  ✓ Article {index + 1} completed: {result.get('event_type', '?')} | {result.get('sentiment', '?')} | {result.get('impact_level', '?')}")
+                except Exception as e:
+                    logger.error(f"Future exception: {e}")
+                    completed += 1
+        
+        results = ordered_results
+    
+    # Log performance metrics
+    elapsed_time = time.time() - start_time
+    avg_per_article = elapsed_time / len(articles) if articles else 0
+    logger.info(
+        f"News batch analysis completed: "
+        f"parallel={should_parallelize}, "
+        f"max_workers={max_workers if should_parallelize else 'N/A'}, "
+        f"articles={len(articles)}, "
+        f"total_time={elapsed_time:.2f}s, "
+        f"avg_per_article={avg_per_article:.2f}s"
+    )
     
     return results
 

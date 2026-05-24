@@ -398,6 +398,9 @@ GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
 # Alpha Vantage configuration for Part 2 (stock data fallback)
 ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 
+# EODHD configuration for Part 2 (stock data fallback when Yahoo Finance fails)
+EODHD_API_KEY = os.getenv("EODHD_API_KEY")
+
 # ─────────────────────────────────────────────────────────────────────────────
 # FEATURE FLAGS
 # ─────────────────────────────────────────────────────────────────────────────

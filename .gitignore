@@ -26,6 +26,8 @@ env/
 ENV/
 .venv
 .venv1/
+backend_env/
+backend/venv/
 
 
 # Local environment files
@@ -46,9 +48,15 @@ uv.lock
 
 # Data files (sensitive)
 financial_news.json
-*.json
+output/*.json
+backend/output/*.json
 *.csv
 *.xlsx
+
+# Databases
+*.sqlite
+*.sqlite3
+*.db
 
 # OS
 .DS_Store
@@ -62,6 +70,11 @@ instance/
 # Logs
 *.log
 logs/
+backend/logs/
 
 # Python cache in subfolders
 **/__pycache__/
+.pytest_cache/
+.mypy_cache/
+backend/.pytest_cache/
+backend/.mypy_cache/

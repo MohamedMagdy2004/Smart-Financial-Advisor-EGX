@@ -1,5 +1,6 @@
 """
 Generate Part 2 financial JSON (technical/trading context) for one EGX ticker.
+Consolidated: Now includes support/resistance enrichment directly.
 """
 import json
 import os
@@ -11,7 +12,8 @@ import pandas as pd
 import yfinance as yf
 import time
 
-from config import OUTPUT_DIR, ALPHA_VANTAGE_API_KEY
+from config import OUTPUT_DIR, ALPHA_VANTAGE_API_KEY, EODHD_API_KEY
+from support_resistance import fetch_support_resistance
 import requests
 logger = logging.getLogger(__name__)
 
@@ -107,6 +109,105 @@ def _fetch_from_alpha_vantage(symbol: str, from_date: str) -> Optional[pd.DataFr
     
     except Exception as e:
         logger.error(f"Alpha Vantage fetch failed: {e}")
+        return None
+
+
+def _fetch_from_eodhd(symbol: str, from_date: str) -> Optional[pd.DataFrame]:
+    """
+    Fallback: Fetch daily stock data from EODHD when Yahoo Finance fails.
+    EODHD supports EGX stocks and provides reliable market data.
+    Returns a DataFrame with OHLCV data, or None if fetch fails.
+    """
+    if not EODHD_API_KEY:
+        logger.error("EODHD_API_KEY is missing. Add it to backend/.env and restart backend.")
+        return None
+    
+    try:
+        # Try symbol formats in order: SYMBOL.EGX, then SYMBOL.CA
+        symbol_formats = [
+            f"{symbol}.EGX",
+            f"{symbol}.CA"
+        ]
+        
+        df = None
+        for eodhd_symbol in symbol_formats:
+            try:
+                logger.info(f"Trying EODHD symbol: {eodhd_symbol}")
+                
+                url = f"https://eodhd.com/api/eod/{eodhd_symbol}"
+                params = {
+                    "api_token": EODHD_API_KEY,
+                    "fmt": "json",
+                    "from": from_date
+                }
+                
+                response = requests.get(url, params=params, timeout=20)
+                
+                if response.status_code != 200:
+                    logger.warning(f"EODHD returned status {response.status_code} for {eodhd_symbol}")
+                    continue
+                
+                data = response.json()
+                
+                # Check for API errors in response
+                if isinstance(data, dict) and ("error" in data or "message" in data):
+                    error_msg = data.get("error") or data.get("message")
+                    logger.warning(f"EODHD error for {eodhd_symbol}: {error_msg}")
+                    continue
+                
+                # Check if data is empty or invalid
+                if not isinstance(data, list) or len(data) == 0:
+                    logger.warning(f"EODHD returned empty data for {eodhd_symbol}")
+                    continue
+                
+                # Successfully got data for this symbol format
+                logger.info(f"EODHD symbol resolved: {eodhd_symbol}")
+                
+                # Parse into DataFrame
+                records = []
+                for entry in data:
+                    try:
+                        records.append({
+                            'Date': pd.to_datetime(entry['date']),
+                            'Open': float(entry['open']),
+                            'High': float(entry['high']),
+                            'Low': float(entry['low']),
+                            'Close': float(entry.get('adjusted_close') or entry.get('close')),
+                            'Volume': int(entry['volume']) if entry.get('volume') else 0
+                        })
+                    except (KeyError, ValueError, TypeError) as e:
+                        logger.debug(f"Skipping malformed EODHD entry: {e}")
+                        continue
+                
+                if not records:
+                    logger.warning(f"No valid records extracted from EODHD for {eodhd_symbol}")
+                    continue
+                
+                df = pd.DataFrame(records)
+                df = df.sort_values('Date').reset_index(drop=True)
+                
+                # Drop rows with missing OHLCV
+                df = df.dropna(subset=['Open', 'High', 'Low', 'Close', 'Volume'])
+                
+                if df.empty:
+                    logger.warning(f"No valid OHLCV data after filtering for {eodhd_symbol}")
+                    continue
+                
+                df.set_index('Date', inplace=True)
+                logger.info(f"Successfully fetched {len(df)} rows from EODHD for {eodhd_symbol}")
+                logger.info(f"Market data source: EODHD")
+                return df
+                
+            except Exception as e:
+                logger.debug(f"Error fetching EODHD for {eodhd_symbol}: {e}")
+                continue
+        
+        # All symbol formats failed
+        logger.warning("All EODHD symbol formats failed")
+        return None
+        
+    except Exception as e:
+        logger.error(f"EODHD fetch failed: {e}")
         return None
 
 
@@ -497,10 +598,10 @@ def generate_part2_financial_json(
     logger.info(f"Starting data fetch for {symbol}")
     df = _fetch_from_yfinance(symbol, from_date)
     
-    # Fallback to Alpha Vantage if yfinance fails
+    # Fallback to EODHD if yfinance fails
     if df is None or df.empty:
-        logger.warning(f"Yahoo Finance failed, attempting Alpha Vantage fallback for {symbol}")
-        df = _fetch_from_alpha_vantage(symbol, from_date)
+        logger.warning(f"Yahoo Finance failed, attempting EODHD fallback for {symbol}")
+        df = _fetch_from_eodhd(symbol, from_date)
     
     # If both sources fail, raise error with helpful guidance
     if df is None or df.empty:
@@ -508,8 +609,7 @@ def generate_part2_financial_json(
             f"❌ Could not fetch data for {symbol} from any source.\n"
             f"  • Yahoo Finance: Currently rate-limited (429 Too Many Requests). "
             f"Please wait a few minutes and try again.\n"
-            f"  • Alpha Vantage: Free tier does not support EGX stocks. "
-            f"(Premium required: https://www.alphavantage.co/premium/)\n"
+            f"  • EODHD: Fallback attempt failed. Check EODHD_API_KEY in backend/.env\n"
             f"ℹ️  Recommended: Wait 5-10 minutes and retry."
         )
         logger.error(error_msg)
@@ -541,13 +641,49 @@ def generate_part2_financial_json(
         "companies": [company_payload],
     }
 
+    # Enrich with support/resistance levels from Mubasher
+    logger.info(f"Enriching {symbol} with support/resistance levels from Mubasher")
+    sr_levels = fetch_support_resistance(symbol)
+    
+    # Merge support/resistance into the company's price object
+    if part2_json["companies"]:
+        company = part2_json["companies"][0]
+        company["price"]["resistance_2_EGP"] = sr_levels.get("resistance_2_EGP")
+        company["price"]["resistance_1_EGP"] = sr_levels.get("resistance_1_EGP")
+        company["price"]["pivot_EGP"] = sr_levels.get("pivot_EGP")
+        company["price"]["support_1_EGP"] = sr_levels.get("support_1_EGP")
+        company["price"]["support_2_EGP"] = sr_levels.get("support_2_EGP")
+        company["price"]["mubasher_sr_source"] = sr_levels.get("source_url")
+        company["price"]["mubasher_sr_status"] = sr_levels.get("status")
+
+        # VALIDATION: Check if S/R extraction succeeded
+        sr_values = [
+            company["price"].get("resistance_2_EGP"),
+            company["price"].get("resistance_1_EGP"),
+            company["price"].get("pivot_EGP"),
+            company["price"].get("support_1_EGP"),
+            company["price"].get("support_2_EGP"),
+        ]
+        null_count = sum(1 for v in sr_values if v is None)
+        
+        if null_count > 2:
+            error_msg = (
+                f"Support/resistance extraction FAILED for {symbol}: "
+                f"{null_count}/5 values are null. "
+                f"Values: R2={sr_values[0]}, R1={sr_values[1]}, Pivot={sr_values[2]}, "
+                f"S1={sr_values[3]}, S2={sr_values[4]}"
+            )
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"{symbol}_part2_financial_{ts}.json"
+    filename = f"{symbol}_financial_analysis_{ts}.json"
     full_path = os.path.join(OUTPUT_DIR, filename)
     with open(full_path, "w", encoding="utf-8") as handle:
         json.dump(part2_json, handle, ensure_ascii=False, indent=2)
 
+    logger.info(f"Generated consolidated financial analysis: {full_path}")
     return {
         "output_file": full_path,
         "payload": part2_json,

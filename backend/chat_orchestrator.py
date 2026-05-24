@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import requests
@@ -16,6 +17,7 @@ from config import COMPANIES, GROQ_API_KEY, GROQ_MODEL
 from decision_engine import QUERY_RESPONSE_RULES, _build_investor_profile_context, generate_final_decision
 from part2_generator import generate_part2_financial_json, _fetch_from_yfinance
 from scraper import scrape_news, validate_news_articles
+
 
 
 logger = logging.getLogger(__name__)
@@ -104,6 +106,232 @@ def classify_query_type(user_message: str) -> str:
         return "FULL_ANALYSIS"
 
     return "FULL_ANALYSIS"
+
+
+def is_follow_up_question(user_message: str) -> bool:
+    """
+    Detect if message is a follow-up question (not a new analysis request).
+    
+    Follow-ups: "أشتريه؟", "ليه؟", "should I buy?", etc.
+    New requests: "حلل سهم", "تحليل جديد", "new analysis", etc.
+    
+    Returns:
+        True if message looks like follow-up, False otherwise
+    """
+    text = user_message.lower().strip()
+    
+    # New analysis request markers - return False
+    new_analysis_markers = [
+        "حلل", "تحليل", "analyze", "analyse", "new analysis",
+        "تحليل جديد", "جديد", "حدث", "refresh", "reanalyze",
+        "آخر أخبار", "latest news", "update", "تحديث"
+    ]
+    if any(marker in text for marker in new_analysis_markers):
+        return False
+    
+    # Follow-up question markers - return True
+    followup_markers = [
+        # Arabic follow-ups
+        "أشتري", "اشتري", "أبيع", "ابيع", "أدخل", "ادخل",
+        "أستنى", "استنى", "انتظر", "ليه", "ليش", "لما",
+        "مناسب", "المخاطرة", "الدعم", "المقاومة", "الأخبار",
+        "يعني", "طب", "إيه", "ايه", "كام", "كام؟",
+        "عامل", "ما الوضع", "اعمل ايه", "أستنى ولا",
+        # English follow-ups
+        "should i buy", "should i sell", "why", "is it", "what is",
+        "support and resistance", "risk", "entry", "exit", "what should i do",
+        "enter now", "hold", "sell now", "buy now"
+    ]
+    
+    if any(marker in text for marker in followup_markers):
+        return True
+    
+    # Short vague questions with no ticker = likely follow-up
+    if len(text) < 20 and not _extract_tickers_from_message(user_message):
+        # Single word or short phrase without ticker = follow-up
+        if len(text.split()) <= 3:
+            return True
+    
+    return False
+
+
+def is_refresh_request(user_message: str) -> bool:
+    """
+    Detect if user explicitly requested a fresh analysis (not using old cache).
+    
+    Returns:
+        True if user said "refresh", "new analysis", "update", etc.
+    """
+    text = user_message.lower()
+    refresh_markers = [
+        "refresh", "تحديث", "حدث", "جديد", "جديدة",
+        "new analysis", "تحليل جديد", "reanalyze", "اعادة",
+        "تحليل من جديد", "من الأول"
+    ]
+    return any(marker in text for marker in refresh_markers)
+
+
+def get_context_age_minutes(analysis_time_iso: str) -> float:
+    """
+    Calculate how many minutes have passed since analysis_time.
+    
+    Args:
+        analysis_time_iso: ISO format timestamp string
+        
+    Returns:
+        Age in minutes (float), or None if parsing fails
+    """
+    try:
+        analysis_dt = datetime.fromisoformat(analysis_time_iso)
+        current_dt = datetime.now(timezone.utc)
+        # Handle naive datetime from fromisoformat
+        if analysis_dt.tzinfo is None:
+            analysis_dt = analysis_dt.replace(tzinfo=timezone.utc)
+        age_seconds = (current_dt - analysis_dt).total_seconds()
+        return age_seconds / 60.0
+    except Exception:
+        return None
+
+
+def answer_follow_up_from_analysis_files(
+    user_message: str,
+    analysis_context: dict,
+    user_risk_profile: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Answer a follow-up question using previously generated analysis files.
+    
+    Does NOT:
+    - Scrape news
+    - Call Modal
+    - Fetch new financial data
+    - Generate new files
+    
+    Only reads and interprets existing analysis files through Groq.
+    
+    Args:
+        user_message: User's follow-up question
+        analysis_context: Dict with ticker, company_name, analysis_time, files
+        user_risk_profile: Optional risk profile for context
+        
+    Returns:
+        Response dict with chat_reply and metadata
+    """
+    ticker = analysis_context.get("ticker")
+    company_name = analysis_context.get("company_name")
+    files = analysis_context.get("files", {})
+    analysis_time = analysis_context.get("analysis_time")
+    
+    logger.info(f"Answering follow-up from files for ticker={ticker}")
+    
+    # Read the most important file: final decision
+    final_decision_file = files.get("final_decision")
+    if not final_decision_file or not os.path.exists(final_decision_file):
+        logger.warning(f"Final decision file not found: {final_decision_file}")
+        return {
+            "ticker": ticker,
+            "query_type": "FOLLOW_UP_FROM_FILES",
+            "chat_reply": "لا أملك معلومة كافية من آخر تحليل للإجابة بدقة. هل تريد أن أجري تحليلًا جديدًا؟",
+            "final_result": {"status": "context_incomplete"},
+            "part1_news_output": None,
+            "part2_financial_output": None,
+        }
+    
+    # Read final decision JSON
+    try:
+        with open(final_decision_file, "r", encoding="utf-8") as f:
+            final_decision_data = json.load(f)
+    except Exception as e:
+        logger.warning(f"Failed to read final decision file: {e}")
+        return {
+            "ticker": ticker,
+            "query_type": "FOLLOW_UP_FROM_FILES",
+            "chat_reply": "لا أملك معلومة كافية من آخر تحليل للإجابة بدقة. هل تريد أن أجري تحليلًا جديدًا؟",
+            "final_result": {"status": "context_read_error"},
+            "part1_news_output": None,
+            "part2_financial_output": None,
+        }
+    
+    # Financial data is now consolidated: read it directly from financial file
+    # (it includes support/resistance levels merged from Mubasher)
+    financial_data = None
+    financial_file = files.get("financial")
+    if financial_file and os.path.exists(financial_file):
+        try:
+            with open(financial_file, "r", encoding="utf-8") as f:
+                financial_data = json.load(f)
+                logger.info(f"Loaded consolidated financial_analysis data: {financial_file}")
+        except Exception as e:
+            logger.warning(f"Could not read consolidated financial file: {e}")
+    
+    # Build Groq prompt
+    system_prompt = (
+        "You are a financial analyst answering follow-up questions about a previous stock analysis. "
+        "Answer ONLY based on the provided analysis files. Do NOT invent new market data or claim real-time updates. "
+        "If the files don't contain enough information to answer, say so clearly. "
+        "Keep answers concise and practical. Respond in the same language as the question (Arabic preferred if possible)."
+    )
+    
+    # Prepare context for LLM
+    final_decision_result = final_decision_data.get("result", {})
+    analysis_summary = {
+        "ticker": ticker,
+        "company_name": company_name,
+        "analysis_time": analysis_time,
+        "recommendation": final_decision_result.get("decision_translator", {}).get("buy_or_not", "N/A"),
+        "reasoning": final_decision_result.get("stock_analysis", "")[:500],
+        "risk_warnings": final_decision_result.get("risk_warning", "")[:300],
+        "technical_summary": final_decision_result.get("technical_summary", "")[:300],
+    }
+    
+    user_prompt = (
+        f"Stock: {ticker} ({company_name})\n"
+        f"Analysis done: {analysis_time}\n"
+        f"Risk profile: {user_risk_profile or 'moderate'}\n\n"
+        f"Previous Analysis Summary:\n"
+        f"{json.dumps(analysis_summary, ensure_ascii=False, indent=2)}\n\n"
+        f"Full final decision data:\n"
+        f"{json.dumps(final_decision_result, ensure_ascii=False, indent=2)}\n\n"
+        f"User follow-up question:\n"
+        f"{user_message}"
+    )
+    
+    # Call Groq with file context
+    try:
+        groq_response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": GROQ_MODEL,
+                "temperature": 0.3,  # Lower for consistency with past analysis
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+            },
+            timeout=30,
+        )
+        groq_response.raise_for_status()
+        answer = groq_response.json()["choices"][0]["message"]["content"]
+        logger.info(f"Follow-up answer generated from files")
+    except Exception as e:
+        logger.error(f"Groq follow-up failed: {e}")
+        answer = f"لا أملك معلومة كافية من آخر تحليل للإجابة بدقة. هل تريد أن أجري تحليلًا جديدًا؟ (خطأ: {str(e)[:50]})"
+    
+    return {
+        "ticker": ticker,
+        "query_type": "FOLLOW_UP_FROM_FILES",
+        "chat_reply": answer,
+        "final_result": {
+            "status": "follow_up_from_files",
+            "based_on_files": files
+        },
+        "part1_news_output": None,  # No new files generated
+        "part2_financial_output": None,  # No new files generated
+    }
 
 
 def _format_simple_fact_reply(ticker: str, user_message: str) -> str:
@@ -382,7 +610,70 @@ def run_chat_pipeline(
     user_risk_profile: Optional[str] = None,
     max_news: int = 20,
     chat_history: Optional[list] = None,
+    last_analysis_context: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
+    """
+    Run the full chat pipeline with follow-up detection and file-based caching.
+    
+    Args:
+        user_message: User input
+        risk_answers: Risk profile answers
+        user_risk_profile: User's risk profile
+        max_news: Max news articles to scrape
+        chat_history: Previous conversation history
+        last_analysis_context: Cached analysis context for follow-ups (from get_last_file_based_analysis_context)
+    """
+    logger.info(f"Pipeline start: message='{user_message[:50]}...' followup_context={last_analysis_context is not None}")
+    
+    # ✅ FOLLOW-UP DETECTION BEFORE TICKER INFERENCE (CRITICAL)
+    is_followup = is_follow_up_question(user_message)
+    is_refresh = is_refresh_request(user_message)
+    
+    logger.info(f"Follow-up detected: {is_followup}, Refresh requested: {is_refresh}")
+    
+    if is_followup and not is_refresh:
+        # User asked a follow-up question
+        if last_analysis_context:
+            # We have cached analysis
+            age_minutes = last_analysis_context.get("age_minutes")
+            logger.info(f"Context available: ticker={last_analysis_context.get('ticker')} age={age_minutes:.1f}m")
+            
+            if age_minutes is not None and age_minutes <= 5.0:
+                # Context is fresh (within 5 minutes) - answer from files
+                logger.info(f"Context fresh (<5m), answering from files")
+                return answer_follow_up_from_analysis_files(
+                    user_message,
+                    last_analysis_context,
+                    user_risk_profile=user_risk_profile
+                )
+            elif age_minutes is not None and age_minutes > 5.0:
+                # Context is too old - ask user
+                logger.info(f"Context stale (>{age_minutes:.0f}m), asking user")
+                ticker = last_analysis_context.get("ticker")
+                return {
+                    "ticker": ticker,
+                    "query_type": "CONTEXT_FRESHNESS_CHECK",
+                    "chat_reply": (
+                        f"آخر تحليل لدي لسهم {ticker} كان منذ {int(age_minutes)} دقيقة.\n"
+                        f"هل تريد أن أجيب بناءً على هذا التحليل، أم أجري تحليلًا جديدًا؟"
+                    ),
+                    "final_result": {"status": "context_stale", "age_minutes": age_minutes},
+                    "part1_news_output": None,
+                    "part2_financial_output": None,
+                }
+        else:
+            # Follow-up but no context - ask for clarification
+            logger.info(f"Follow-up detected but no context, asking clarification")
+            return {
+                "ticker": None,
+                "query_type": "CLARIFICATION_NEEDED",
+                "chat_reply": "تقصد أي سهم؟ اكتب اسم الشركة أو رمز السهم.",
+                "final_result": {"status": "clarification_needed"},
+                "part1_news_output": None,
+                "part2_financial_output": None,
+            }
+    
+    # NOT a follow-up (or explicit refresh) - run full pipeline
     query_type = classify_query_type(user_message)
     if _is_general_chat(user_message):
         general_reply = run_general_chat(user_message, chat_history)
@@ -518,6 +809,22 @@ def run_chat_pipeline(
         if investor_profile_block:
             decision_result.setdefault("investor_profile_block", investor_profile_block)
 
+    # Extract file paths for follow-up context
+    # Note: financial_json_enriched no longer exists separately (consolidated into financial_json)
+    final_decision_path = final_decision.get("output_file")
+    
+    # Build metadata for follow-up questions (5-minute cache)
+    analysis_metadata = {
+        "context_type": "file_based_stock_analysis",
+        "ticker": ticker,
+        "company_name": company_name,
+        "analysis_time": datetime.now(timezone.utc).isoformat(),
+        "files": {
+            "news": news_path,
+            "financial": financial_path,
+            "final_decision": final_decision_path,
+        }
+    }
 
     return {
         "ticker_inference": inferred,
@@ -527,4 +834,5 @@ def run_chat_pipeline(
         "final_result": decision_result,
         "part1_news_output": news_path,
         "part2_financial_output": financial_path,
+        "metadata": analysis_metadata,  # For follow-up context
     }

@@ -100,6 +100,7 @@ class DecisionRequest(BaseModel):
 
 class ChatMessageRequest(BaseModel):
     message: str
+    user_id: Optional[UUID] = None  # Optional: for chat memory persistence
     max_news: Optional[int] = 10
     user_risk_profile: Optional[str] = None
     risk_answers: Optional[dict] = None
@@ -294,15 +295,49 @@ async def run_decision_engine(payload: DecisionRequest):
 
 
 @app.post("/chat/message", tags=["Chat"])
-async def chat_message(payload: ChatMessageRequest):
+async def chat_message(payload: ChatMessageRequest, db: Session = Depends(get_db)):
+    """Chat with the AI about EGX stocks"""
     try:
+        # Load last analysis context for follow-ups
+        last_context = None
+        if payload.user_id:
+            # User authenticated - try to load cached analysis
+            try:
+                last_context = services.get_last_file_based_analysis_context(db, payload.user_id)
+                if last_context:
+                    logger.info(f"Loaded last context: ticker={last_context.get('ticker')}")
+            except Exception as e:
+                logger.warning(f"Could not load analysis context: {e}")
+        
+        # Run pipeline with optional context
         result = run_chat_pipeline(
             user_message=payload.message,
             risk_answers=payload.risk_answers or {},
             user_risk_profile=payload.user_risk_profile,
             max_news=payload.max_news or 20,
             chat_history=payload.history or [],
+            last_analysis_context=last_context,
         )
+        
+        # Save analysis context for follow-ups
+        logger.info(f"DEBUG: Checking save conditions: user_id={payload.user_id}, has_metadata={bool(result.get('metadata'))}")
+        if payload.user_id and result.get("metadata"):
+            logger.info(f"DEBUG: user_id={payload.user_id}")
+            logger.info(f"DEBUG: result metadata keys={result.get('metadata', {}).keys()}")
+            logger.info(f"DEBUG: result metadata ticker={result.get('metadata', {}).get('ticker')}")
+            try:
+                saved = services.save_file_based_analysis_context(
+                    db,
+                    payload.user_id,
+                    result.get("metadata")
+                )
+                logger.info(f"DEBUG: save_file_based_analysis_context returned={saved}")
+                logger.info(f"Saved analysis context for user {payload.user_id}")
+            except Exception as e:
+                logger.error(f"Could not save analysis context: {e}", exc_info=True)
+        else:
+            logger.info(f"DEBUG: Skipping context save: user_id={payload.user_id}, metadata_exists={bool(result.get('metadata'))}")
+        
         return {"status": "success", **result}
     except Exception as exc:
         logger.error(f"Chat pipeline failed: {exc}", exc_info=True)

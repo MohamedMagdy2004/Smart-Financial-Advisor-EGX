@@ -11,7 +11,6 @@ from typing import Any, Dict, List, Optional
 import requests
 
 from config import OUTPUT_DIR, GROQ_API_KEY, GROQ_MODEL
-from support_resistance import fetch_support_resistance
 
 
 logger = logging.getLogger(__name__)
@@ -248,6 +247,13 @@ def _compact_financial_company(company: Optional[Dict[str, Any]]) -> Optional[Di
             "current_EGP": price.get("current_EGP"),
             "sma20_EGP": price.get("sma20_EGP"),
             "sma50_EGP": price.get("sma50_EGP"),
+            "resistance_2_EGP": price.get("resistance_2_EGP"),
+            "resistance_1_EGP": price.get("resistance_1_EGP"),
+            "pivot_EGP": price.get("pivot_EGP"),
+            "support_1_EGP": price.get("support_1_EGP"),
+            "support_2_EGP": price.get("support_2_EGP"),
+            "mubasher_sr_source": price.get("mubasher_sr_source"),
+            "mubasher_sr_status": price.get("mubasher_sr_status"),
             "support_EGP": price.get("support_EGP"),
             "resistance_EGP": price.get("resistance_EGP"),
         },
@@ -259,27 +265,6 @@ def _compact_financial_company(company: Optional[Dict[str, Any]]) -> Optional[Di
         "llm_prompt_summary": _truncate_text(company.get("llm_prompt_summary"), 320),
     }
 
-
-def enrich_financial_with_mubasher_levels(financial_data: Dict[str, Any]) -> Dict[str, Any]:
-    companies = financial_data.get("companies", [])
-    for company in companies:
-        symbol = company.get("symbol")
-        if not symbol:
-            continue
-        levels = fetch_support_resistance(symbol)
-
-        company.setdefault("price", {})
-        if levels.get("support") is not None:
-            company["price"]["support_EGP"] = levels["support"]
-        if levels.get("resistance") is not None:
-            company["price"]["resistance_EGP"] = levels["resistance"]
-
-        company["price"]["sr_source"] = levels.get("source", "mubasher")
-        company["price"]["sr_source_url"] = levels.get("source_url")
-        company["price"]["sr_status"] = levels.get("status")
-
-    financial_data["sr_enriched_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    return financial_data
 
 
 def _build_prompt_payload(
@@ -341,6 +326,23 @@ def _build_prompt_payload(
 
 def build_groq_prompt(payload: Dict[str, Any]) -> Dict[str, Any]:
     investor_profile = payload.get("investor_profile", {})
+    financial_company = payload.get("financial_company", {})
+    price = financial_company.get("price", {})
+    
+    # Build explicit S/R levels text
+    sr_text = ""
+    if price.get("mubasher_sr_status") == "ok":
+        sr_text = (
+            f"\n---Support/Resistance from Mubasher (مستويات الدعم والمقاومة من مباشر)---\n"
+            f"R2 (مقاومة ثانية) = {price.get('resistance_2_EGP')} EGP\n"
+            f"R1 (مقاومة أولى) = {price.get('resistance_1_EGP')} EGP\n"
+            f"Pivot (محور) = {price.get('pivot_EGP')} EGP\n"
+            f"S1 (دعم أول) = {price.get('support_1_EGP')} EGP\n"
+            f"S2 (دعم ثاني) = {price.get('support_2_EGP')} EGP\n"
+            f"Source: {price.get('mubasher_sr_source')}\n"
+            f"---Rules: Use these exact levels in Arabic report. Do NOT infer support/resistance from SMA. Do NOT write 'لا توجد مستويات دعم ومقاومة'.---\n"
+        )
+    
     system_prompt = (
         "أنت خبير مالي رفيع المستوى ومحلل فني وأساسي متخصص في البورصة المصرية (EGX). "
         "مهمتك ليست مجرد سرد أرقام، بل تقديم رؤية استراتيجية شاملة ومستفيضة. "
@@ -355,6 +357,7 @@ def build_groq_prompt(payload: Dict[str, Any]) -> Dict[str, Any]:
         f"The model MUST use this investor profile block to shape its recommendation. "
         f"If horizon is medium or long, do NOT lead with technical indicators; lead with fundamentals first.\n\n"
         f"حلل سهم {payload['ticker']} وفق نوع السؤال التالي: {payload.get('query_text') or 'طلب تحليل استثماري'}\n\n"
+        f"{sr_text}"
         "1) في stock_analysis: استخدم مزيج المؤشرات مع وزن يتوافق مع أفق الاستثمار.\n"
         "2) إذا كان الأفق متوسطاً أو طويلاً، ابدأ بالتحليل الأساسي ثم ادعم بالفني.\n"
         "3) في advanced_explanation: ركز على المستويات الرقمية والدعم والمقاومة وحجم السيولة.\n"
@@ -438,9 +441,12 @@ def generate_final_decision(
 
     profile = user_risk_profile or _derive_risk_profile_from_answers(risk_answers)
 
-    enriched_financial = enrich_financial_with_mubasher_levels(financial_data)
+    # Financial data is already enriched with support/resistance from part2_generator
+    # No additional enrichment needed here
+    logger.info(f"Using consolidated financial_analysis file (already enriched with Mubasher S/R levels)")
+    
     target_company = None
-    for company in enriched_financial.get("companies", []):
+    for company in financial_data.get("companies", []):
         if company.get("symbol", "").upper() == ticker.upper():
             target_company = company
             break
@@ -454,7 +460,7 @@ def generate_final_decision(
         payload = _build_prompt_payload(
             ticker=ticker,
             news_data=news_data,
-            financial_data=enriched_financial,
+            financial_data=financial_data,
             user_risk_profile=profile,
             risk_context=risk_context,
             query_type=query_type,
@@ -462,6 +468,37 @@ def generate_final_decision(
             max_news_items=max_items,
             max_text_length=text_len,
         )
+        
+        # VALIDATION: Ensure Mubasher S/R levels are present if status is "ok"
+        financial_company = payload.get("financial_company", {})
+        price = financial_company.get("price", {})
+        
+        if price.get("mubasher_sr_status") == "ok":
+            required_fields = [
+                "resistance_2_EGP",
+                "resistance_1_EGP",
+                "pivot_EGP",
+                "support_1_EGP",
+                "support_2_EGP",
+            ]
+            missing = [k for k in required_fields if price.get(k) is None]
+            if missing:
+                raise ValueError(
+                    f"Mubasher support/resistance status is ok but missing fields: {missing}. "
+                    f"Price object: {price}"
+                )
+        
+        # DEBUG LOG: S/R levels being sent to LLM
+        logger.info(
+            f"Prompt S/R levels for {ticker}: "
+            f"R2={price.get('resistance_2_EGP')}, "
+            f"R1={price.get('resistance_1_EGP')}, "
+            f"P={price.get('pivot_EGP')}, "
+            f"S1={price.get('support_1_EGP')}, "
+            f"S2={price.get('support_2_EGP')}, "
+            f"status={price.get('mubasher_sr_status')}"
+        )
+        
         try:
             llm_result = _call_groq(payload)
             break
@@ -483,10 +520,7 @@ def generate_final_decision(
         ) from last_http_error
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    financial_filename = f"{ticker}_financial_enriched_{timestamp}.json"
     decision_filename = f"{ticker}_final_decision_{timestamp}.json"
-
-    enriched_financial_path = _save_json(enriched_financial, financial_filename)
 
     final_output = {
         "part": "final_decision",
@@ -497,7 +531,6 @@ def generate_final_decision(
         "inputs": {
             "news_json": news_json_path,
             "financial_json": financial_json_path,
-            "financial_json_enriched": enriched_financial_path,
         },
         "llm_model": GROQ_MODEL,
         "prompt_debug": build_groq_prompt(payload),

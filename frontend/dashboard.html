@@ -1646,19 +1646,55 @@
         }
 
         // 2. API & Global Config
-        const API_BASE = "http://localhost:8000";
+        const API_BASE = "http://127.0.0.1:8000";
         const messagesEl = document.getElementById("messages");
         const sendBtn = document.getElementById("sendBtn");
         const inputEl = document.getElementById("messageInput");
         const apiStatusEl = document.getElementById("apiStatus");
         let currentConversationId = null; // معرف المحادثة الحالية المفتوحة
 
-        // 3. User Session check
-        const currentUser = JSON.parse(localStorage.getItem('egx_current_user'));
+        // 2b. Safe user ID extraction with multiple fallbacks
+        function getCurrentUserId() {
+            const possibleKeys = ["egx_current_user", "user", "currentUser", "authUser", "user_id", "userId"];
+
+            for (const key of possibleKeys) {
+                const value = localStorage.getItem(key);
+                if (!value) continue;
+
+                try {
+                    // Try JSON parsing first
+                    const parsed = JSON.parse(value);
+                    if (parsed && parsed.id) return parsed.id;
+                    if (parsed && parsed.user_id) return parsed.user_id;
+                    if (parsed && parsed.uuid) return parsed.uuid;
+                } catch (e) {
+                    // value is plain text, not JSON - check if it's a UUID
+                    if (typeof value === "string" && /^[0-9a-fA-F-]{36}$/.test(value)) {
+                        return value;
+                    }
+                }
+            }
+
+            console.warn("No user_id found in localStorage; chat memory will be disabled");
+            return null;
+        }
+
+        // 3. User Session check with safe parsing
+        let currentUser = null;
+        try {
+            const userStr = localStorage.getItem('egx_current_user');
+            if (userStr) {
+                currentUser = JSON.parse(userStr);
+            }
+        } catch (e) {
+            console.warn("Could not parse egx_current_user from localStorage:", e);
+        }
+
+        // If no valid user found, redirect to login
         if (!currentUser || !currentUser.id) {
             window.location.href = 'index.html';
         }
-        const userId = currentUser.id;
+        const userId = getCurrentUserId();
 
         // 4. UI Initial Setup
         if(document.getElementById('userName')) {
@@ -2042,8 +2078,9 @@
             const drawdownEl = document.getElementById("drawdown");
             const styleEl = document.getElementById("style");
 
-            return {
+            const payload = {
                 message: message,
+                user_id: userId,
                 max_news: Number(maxNewsEl ? maxNewsEl.value : 20),
                 user_risk_profile: riskProfileEl ? riskProfileEl.value : null,
                 risk_answers: {
@@ -2052,6 +2089,13 @@
                     style: styleEl ? styleEl.value : "balanced"
                 }
             };
+            
+            console.log("Sending chat:", {
+                message: payload.message,
+                user_id: payload.user_id
+            });
+            
+            return payload;
         }
 
         // 7. API Calls & Core System
@@ -2078,19 +2122,29 @@
 
         // Watchlist Functions
         async function loadWatchlist() {
-            const response = await fetch('/api/watchlist/');
-            const tickers = await response.json();
-            
-            const container = document.getElementById('watchlistContainer');
-            container.innerHTML = ''; // تنظيف العناصر القديمة لمنع التكرار
-            
-            tickers.forEach(item => {
-                container.innerHTML += `
-                    <div class="watchlist-item" onclick="analyzeTicker('${item.ticker}')">
-                        <span class="ticker-badge">${item.ticker}</span>
-                        <i class="fas fa-times remove-icon" onclick="removeFromWatchlist('${item.id}')"></i>
-                    </div>`;
-            });
+            try {
+                const response = await fetch(`${API_BASE}/watchlist?user_id=${userId}`);
+                if (!response.ok) {
+                    console.error(`API error: ${response.status} ${response.statusText}`);
+                    const errorText = await response.text();
+                    console.error("Response:", errorText);
+                    return;
+                }
+                const tickers = await response.json();
+                
+                const container = document.getElementById('watchlistContainer');
+                container.innerHTML = ''; // تنظيف العناصر القديمة لمنع التكرار
+                
+                tickers.forEach(item => {
+                    container.innerHTML += `
+                        <div class="watchlist-item" onclick="analyzeTicker('${item.ticker}')">
+                            <span class="ticker-badge">${item.ticker}</span>
+                            <i class="fas fa-times remove-icon" onclick="removeFromWatchlist('${item.id}')"></i>
+                        </div>`;
+                });
+            } catch (e) {
+                console.error('loadWatchlist error:', e);
+            }
         }
     
        function addToWatchlist() {
@@ -2163,6 +2217,13 @@
             
             try {
                 const res = await fetch(`${API_BASE}/portfolio?user_id=${userId}`);
+                if (!res.ok) {
+                    console.error(`API error: ${res.status} ${res.statusText}`);
+                    const errorText = await res.text();
+                    console.error("Response:", errorText);
+                    container.innerHTML = '<div class="empty-state" style="color:#ef6b6b">⚠️ Error loading portfolio</div>';
+                    return;
+                }
                 const data = await res.json();
                 
                 if(!data || data.length === 0) {
@@ -2330,9 +2391,17 @@
                 });
 
                 loadingMsg.remove(); // حذف رسالة التحميل بعد استلام الرد
+                
+                if (!response.ok) {
+                    console.error(`API error: ${response.status} ${response.statusText}`);
+                    const errorText = await response.text();
+                    console.error("Error response:", errorText);
+                    throw new Error(`Server error: ${response.status}`);
+                }
+                
                 const data = await response.json();
 
-                if (!response.ok || data.status !== "success") throw new Error(data?.error || "Request failed");
+                if (data.status !== "success") throw new Error(data?.error || "Request failed");
 
                 // 5. استخراج البيانات والردود والقرارات الاستثمارية للـ Bot
                 const finalResult = data.final_result || {};

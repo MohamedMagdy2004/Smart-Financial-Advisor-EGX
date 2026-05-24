@@ -1,6 +1,7 @@
 from models import User, Message, Watchlist, PortfolioHolding
 from sqlalchemy.orm import Session
 from schemas import UserCreate, MessageCreate, WatchlistCreate, PortfolioHoldingCreate, PortfolioHoldingUpdate, UserUpdate
+from datetime import datetime, timezone
 import bcrypt
 import uuid
 
@@ -187,3 +188,113 @@ def delete_messages_by_user(db: Session, user_id):
         db.delete(message)
     db.commit()
     return messages
+
+
+# ==================== File-Based Analysis Context (Follow-up Support) ====================
+
+def save_file_based_analysis_context(db: Session, user_id, analysis_metadata: dict):
+    """
+    Save file-based analysis context for follow-up questions.
+    
+    Stores analysis metadata (files, ticker, timestamps) in the messages table.
+    Allows follow-up questions to reuse analysis without re-running pipeline.
+    
+    Args:
+        db: Database session
+        user_id: User UUID (optional - if None, context not saved)
+        analysis_metadata: Dict with context_type, ticker, company_name, analysis_time, files
+    """
+    import logging
+    
+    if not user_id:
+        # No user_id = no DB persistence
+        logging.warning("No user_id provided, skipping context save")
+        return None
+    
+    clean_uid = _ensure_uuid(user_id)
+    logging.info(f"SAVING CONTEXT: metadata keys={analysis_metadata.keys()}")
+    
+    try:
+        logging.info(f"user={clean_uid}")
+        logging.info(f"ticker={analysis_metadata.get('ticker')}")
+        logging.info(f"analysis_time={analysis_metadata.get('analysis_time')}")
+        
+        # Save as assistant message with metadata
+        context_message = Message(
+            user_id=clean_uid,
+            role="assistant",
+            content="[analysis_context]",  # Marker for context-only message
+            llm_output=analysis_metadata
+        )
+        db.add(context_message)
+        db.commit()
+        db.refresh(context_message)
+        logging.info(f"CONTEXT SAVED SUCCESSFULLY: message_id={context_message.id}")
+        return context_message
+    except Exception as e:
+        # Context save failure should not block chat
+        logging.error(f"Failed to save analysis context: {e}", exc_info=True)
+        return None
+
+
+def get_last_file_based_analysis_context(db: Session, user_id):
+    """
+    Load the last file-based analysis context for follow-up questions.
+    
+    Args:
+        db: Database session
+        user_id: User UUID
+        
+    Returns:
+        Dict with ticker, company_name, analysis_time, files, or None if not found
+    """
+    import logging
+    
+    if not user_id:
+        logging.warning("No user_id provided for context loading")
+        return None
+    
+    clean_uid = _ensure_uuid(user_id)
+    logging.info(f"Loading context for user={clean_uid}")
+    
+    try:
+        # Query latest assistant messages with file-based analysis context
+        messages = db.query(Message).filter(
+            Message.user_id == clean_uid,
+            Message.role == "assistant"
+        ).order_by(Message.created_at.desc()).limit(10).all()
+        
+        logging.info(f"Found {len(messages)} assistant messages for user")
+        
+        # Find latest context_type == "file_based_stock_analysis"
+        for i, msg in enumerate(messages):
+            logging.info(f"Message {i}: content={msg.content}, has_llm_output={msg.llm_output is not None}")
+            if msg.llm_output:
+                logging.info(f"Message {i}: llm_output keys={msg.llm_output.keys()}")
+            
+            if msg.llm_output and msg.llm_output.get("context_type") == "file_based_stock_analysis":
+                analysis_time_str = msg.llm_output.get("analysis_time")
+                try:
+                    analysis_dt = datetime.fromisoformat(analysis_time_str)
+                    now = datetime.now(timezone.utc)
+                    # Handle naive datetime from fromisoformat
+                    if analysis_dt.tzinfo is None:
+                        analysis_dt = analysis_dt.replace(tzinfo=timezone.utc)
+                    age_minutes = (now - analysis_dt).total_seconds() / 60
+                except:
+                    age_minutes = None
+                
+                logging.info(f"Loaded ticker={msg.llm_output.get('ticker')}, age_minutes={age_minutes}")
+                return {
+                    "ticker": msg.llm_output.get("ticker"),
+                    "company_name": msg.llm_output.get("company_name"),
+                    "analysis_time": msg.llm_output.get("analysis_time"),
+                    "files": msg.llm_output.get("files", {}),
+                    "age_minutes": age_minutes
+                }
+        
+        logging.warning("No context found: no message with context_type=file_based_stock_analysis")
+        return None
+    except Exception as e:
+        logging.error(f"Failed to load analysis context: {e}", exc_info=True)
+        return None
