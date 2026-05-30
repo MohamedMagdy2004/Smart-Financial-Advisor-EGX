@@ -3,13 +3,20 @@ Configuration file for Egyptian Stock Exchange News Pipeline
 """
 import json
 import os
+from pathlib import Path
 
+# Load environment variables from .env file
 try:
     from dotenv import load_dotenv
-    load_dotenv()
-    GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-except Exception:
-    pass
+    env_path = Path(__file__).parent / ".env"
+    if env_path.exists():
+        load_dotenv(dotenv_path=env_path, verbose=True)
+    else:
+        load_dotenv(verbose=True)  # Fallback to default location
+except ImportError:
+    print("WARNING: python-dotenv not installed. Falling back to OS environment variables.")
+
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MODEL CONFIGURATION
@@ -392,7 +399,7 @@ MODAL_API_TOKEN = os.environ.get("MODAL_API_TOKEN", "")
 USE_MODAL = os.environ.get("USE_MODAL", "True").lower() == "true"
 
 # Groq configuration for Part 3 decision engine
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+# GROQ_API_KEY already defined at top of file after load_dotenv()
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
 
 # Alpha Vantage configuration for Part 2 (stock data fallback)

@@ -343,6 +343,8 @@ async def chat_message(payload: ChatMessageRequest, db: Session = Depends(get_db
         logger.error(f"Chat pipeline failed: {exc}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Chat pipeline failed: {exc}")
 
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # WATCHLIST & PORTFOLIO ENDPOINTS (COMPATIBLE WITH BOTH FRONTENDS)
 # ─────────────────────────────────────────────────────────────────────────────

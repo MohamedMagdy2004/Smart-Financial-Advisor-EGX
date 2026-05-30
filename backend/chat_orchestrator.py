@@ -2,6 +2,7 @@
 Chat orchestration for end-to-end pipeline:
 user message -> infer ticker -> part1 -> part2 -> final decision.
 Updated to prioritize professional persona in chat reply.
+FIXED: Added confidence threshold + vague message detection to prevent random ticker guessing.
 """
 import json
 import logging
@@ -18,11 +19,13 @@ from decision_engine import QUERY_RESPONSE_RULES, _build_investor_profile_contex
 from part2_generator import generate_part2_financial_json, _fetch_from_yfinance
 from scraper import scrape_news, validate_news_articles
 
-
-
 logger = logging.getLogger(__name__)
 
+# ─────────────────────────────────────────────────────────────────────────────
+# CONSTANTS
+# ─────────────────────────────────────────────────────────────────────────────
 
+MIN_CONFIDENCE_THRESHOLD = 0.65  # Reject LLM inference below this confidence
 
 
 def _known_tickers() -> set:
@@ -73,7 +76,6 @@ def classify_query_type(user_message: str) -> str:
     if len(tickers) >= 2 or any(marker in text for marker in comparison_markers):
         return "COMPARISON"
 
-    # "What's the latest on X today?" should be QUICK_SUMMARY, not NEWS_ONLY.
     quick_summary_priority_markers = ["إيه أخبار", "ايه اخبار", "what's up with", "how is"]
     if any(marker in text for marker in quick_summary_priority_markers):
         return "QUICK_SUMMARY"
@@ -397,8 +399,8 @@ def _format_full_analysis_reply(ticker: str, decision_result: Dict[str, Any], ch
     def clean_llm_text(text):
         if not text:
             return ""
-        text = re.sub(r'```json.*?```', '', text, flags=re.DOTALL)
-        text = re.sub(r'\{.*?"stock_analysis".*?\}', '', text, flags=re.DOTALL)
+        text = re.sub(r'`json.*?`', '', text, flags=re.DOTALL)
+        text = re.sub(r'{.*?"stock_analysis".*?}', '', text, flags=re.DOTALL)
         tags_to_remove = ["### stock_analysis", "### advanced_explanation", "### اربط الأخبار بالواقع"]
         for tag in tags_to_remove:
             text = text.replace(tag, "")
@@ -448,8 +450,6 @@ def _companies_for_prompt() -> list:
     ]
 
 
-
-
 def _fallback_match_ticker(user_message: str) -> Optional[str]:
     text = user_message.upper()
     for _, (name_ar, ticker) in COMPANIES.items():
@@ -458,70 +458,150 @@ def _fallback_match_ticker(user_message: str) -> Optional[str]:
     return None
 
 
-def infer_ticker_from_message(user_message: str) -> Dict[str, Any]:
-    fallback = _fallback_match_ticker(user_message)
-    if not GROQ_API_KEY:
-        if fallback:
-            return {"ticker": fallback, "reason": "fallback_without_groq", "confidence": 0.6}
-        raise RuntimeError("GROQ_API_KEY is required to infer ticker from free text.")
+def _is_vague_message(user_message: str) -> bool:
+    """
+    Detects vague messages that don't specify any company/ticker.
+    Examples: 'حلل', 'analyze', 'give me analysis', 'عايز توصية'
+    Returns True if the message is too vague to infer a specific ticker.
+    """
+    msg = user_message.lower().strip()
+    words = msg.split()
+    
+    # Single-word financial verbs without context
+    vague_single_words = [
+        "حلل", "تحليل", "analyze", "analysis", "analyse",
+        "توصية", "توصيات", "recommend", "recommendation",
+        "تقرير", "report", "أنصح", "نصيحة", "advice",
+        "سهم", "stock", "أسهم", "stocks",
+        "بورصة", "market", "سوق",
+        "اشتري", "أشتري", "buy",
+        "بيع", "sell",
+        "أداء", "performance"
+    ]
+    
+    # If it's a single vague word → definitely vague
+    if len(words) == 1 and msg in vague_single_words:
+        return True
+    
+    # If message is very short (<=2 words) and contains only vague terms
+    if len(words) <= 2:
+        has_specific = any(
+            word in msg for word in ["comi", "fwry", "etel", "hrho", "swdy", "oras", "abuk", "tmgh"]
+        )
+        if not has_specific:
+            return True
+    
+    return False
 
+
+def infer_ticker_from_message(user_message: str) -> Dict[str, Any]:
+    """
+    Infer ticker from user message with confidence validation.
+    FIXED: Rejects low-confidence inferences and vague messages.
+    """
+    # Step 1: Check if message is too vague
+    if _is_vague_message(user_message):
+        raise RuntimeError(
+            "لم تحدد شركة معينة للتحليل. "
+            "يرجى ذكر اسم الشركة أو رمز التداول (مثل: COMI، فوري، البنك التجاري الدولي)."
+        )
+    
+    # Step 2: Try fallback matching (exact ticker or company name in message)
+    fallback = _fallback_match_ticker(user_message)
+    if fallback:
+        return {
+            "ticker": fallback,
+            "reason": "fallback_match",
+            "confidence": 0.85
+        }
+    
+    # Step 3: If no Groq key, can't do LLM inference
+    if not GROQ_API_KEY:
+        logger.error("GROQ_API_KEY not set in environment variables")
+        raise RuntimeError(
+            "GROQ_API_KEY is required to infer ticker from free text. "
+            "Please mention a specific company name or ticker symbol."
+        )
+    
+    # Step 4: LLM inference with strict confidence threshold
     companies = _companies_for_prompt()
     system_prompt = (
-        "You map Arabic/English user stock requests to EGX ticker symbols. "
+        "You are a ticker inference assistant for the Egyptian Stock Exchange (EGX). "
+        "Your job is to map user requests to the correct ticker symbol. "
+        "Rules:\n"
+        "1. ONLY pick from the provided company list\n"
+        "2. If the user mentions a specific company name or ticker, return it with high confidence\n"
+        "3. If the message is vague or doesn't clearly mention a company, set confidence LOW (<0.5)\n"
+        "4. NEVER guess randomly - if uncertain, set confidence below 0.5\n"
         "Return strict JSON only."
     )
     user_prompt = (
-        "Pick exactly one ticker from the provided company list.\n"
-        "If uncertain, return the closest valid ticker with lower confidence.\n"
-        "Output schema: {\"ticker\": \"COMI\", \"confidence\": 0.0-1.0, \"reason\": \"...\"}\n\n"
+        "Analyze the user message and determine which EGX ticker they are asking about.\n"
+        "If the message does NOT clearly mention a specific company or ticker, "
+        "set confidence below 0.5 and explain why.\n\n"
         f"Company list: {json.dumps(companies, ensure_ascii=False)}\n"
-        f"User message: {user_message}"
+        f"User message: {user_message}\n\n"
+        'Output schema: {"ticker": "COMI", "confidence": 0.0-1.0, "reason": "..."}'
     )
 
-    response = requests.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {GROQ_API_KEY}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "model": GROQ_MODEL,
-            "temperature": 0.0,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-
-
-                {"role": "user", "content": user_prompt},
-            ],
-        },
-        timeout=60,
-    )
-    response.raise_for_status()
-    content = response.json()["choices"][0]["message"]["content"]
+    logger.info(f"Calling Groq API for ticker inference with model: {GROQ_MODEL}")
+    try:
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": GROQ_MODEL,
+                "temperature": 0.0,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+            },
+            timeout=60,
+        )
+        response.raise_for_status()
+        logger.info(f"Groq API responded with status {response.status_code}")
+        content = response.json()["choices"][0]["message"]["content"]
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Groq API request failed: {str(e)}", exc_info=True)
+        raise
 
     try:
         parsed = json.loads(content)
     except json.JSONDecodeError:
-        if fallback:
-            return {"ticker": fallback, "reason": "fallback_after_bad_json", "confidence": 0.55}
-
-
-        raise RuntimeError("Ticker inference model output was not valid JSON")
+        raise RuntimeError(
+            "Ticker inference model returned invalid JSON. "
+            "Please mention a specific company name or ticker symbol."
+        )
 
     ticker = str(parsed.get("ticker", "")).upper().strip()
+    confidence = float(parsed.get("confidence", 0))
+    reason = str(parsed.get("reason", "model_inference"))
+    
+    # Step 5: Validate confidence threshold
+    if confidence < MIN_CONFIDENCE_THRESHOLD:
+        raise RuntimeError(
+            f"لم أتمكن من تحديد الشركة المقصودة بدقة كافية (confidence: {confidence:.2f}). "
+            f"السبب: {reason}. "
+            "يرجى ذكر اسم الشركة أو رمز التداول بوضوح (مثل: COMI، فوري، البنك التجاري الدولي)."
+        )
+    
+    # Step 6: Validate ticker exists in our database
     valid_tickers = {value[1] for value in COMPANIES.values()}
     if ticker not in valid_tickers:
-        if fallback:
-            return {"ticker": fallback, "reason": "fallback_after_invalid_ticker", "confidence": 0.55}
-        raise RuntimeError(f"Inferred invalid ticker: {ticker}")
+        raise RuntimeError(
+            f"الرمز '{ticker}' غير موجود في قائمة الشركات المدعومة. "
+            "يرجى التأكد من صحة الاسم أو الرمز."
+        )
 
     return {
         "ticker": ticker,
-        "confidence": float(parsed.get("confidence", 0.7)),
-        "reason": parsed.get("reason", "model_inference"),
+        "confidence": confidence,
+        "reason": reason,
     }
-
-
 
 
 def _company_name_from_ticker(ticker: str) -> str:
@@ -529,8 +609,6 @@ def _company_name_from_ticker(ticker: str) -> str:
         if symbol == ticker.upper():
             return name_ar
     raise RuntimeError(f"Unknown ticker: {ticker}")
-
-
 
 
 def _is_general_chat(user_message: str) -> bool:
@@ -542,9 +620,7 @@ def _is_general_chat(user_message: str) -> bool:
     msg = user_message.lower().strip()
     
     # 1. Explicit ticker mention (4-letter code in caps) = NOT general chat
-    if re.search(r'\b[A-Z]{4}\b', user_message):
-
-
+    if re.search(r'[A-Z]{4}', user_message):
         return False
     
     # 2. Explicit financial action verbs = NOT general chat
@@ -579,6 +655,18 @@ def _is_general_chat(user_message: str) -> bool:
 
 
 def run_general_chat(user_message: str, chat_history: Optional[list] = None) -> str:
+    logger.info(f"run_general_chat() called with message: {user_message[:100]}")
+    
+    if not GROQ_API_KEY:
+        logger.error("GROQ_API_KEY not set in environment - cannot make Groq API call")
+        raise RuntimeError(
+            "GROQ_API_KEY is not configured. "
+            "Please set the GROQ_API_KEY environment variable."
+        )
+    
+    logger.info(f"GROQ_API_KEY is set (length: {len(GROQ_API_KEY)})")
+    logger.info(f"GROQ_MODEL: {GROQ_MODEL}")
+    
     system_prompt = (
         "You are the 'EGX Smart Financial Advisor', a cutting-edge graduation project "
         "developed by 4th-year students at the Faculty of Artificial Intelligence. "
@@ -594,14 +682,22 @@ def run_general_chat(user_message: str, chat_history: Optional[list] = None) -> 
         messages.extend(chat_history[-3:])  # إضافة آخر 3 رسائل للسياق
     messages.append({"role": "user", "content": user_message})
 
-    response = requests.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
-        json={"model": GROQ_MODEL, "messages": messages, "temperature": 0.7},
-        timeout=90,
-    )
-    response.raise_for_status()  # Raise HTTPError if status code is not 2xx
-    return response.json()["choices"][0]["message"]["content"]
+    logger.info(f"Calling Groq API for general chat with model: {GROQ_MODEL}")
+    logger.debug(f"Request headers: Authorization: Bearer {GROQ_API_KEY[:20]}...")
+    logger.debug(f"Messages count: {len(messages)}")
+    try:
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+            json={"model": GROQ_MODEL, "messages": messages, "temperature": 0.7},
+            timeout=90,
+        )
+        response.raise_for_status()  # Raise HTTPError if status code is not 2xx
+        logger.info(f"Groq API responded with status {response.status_code}")
+        return response.json()["choices"][0]["message"]["content"]
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Groq API request failed: {str(e)}", exc_info=True)
+        raise
 
 
 def run_chat_pipeline(
@@ -674,7 +770,9 @@ def run_chat_pipeline(
             }
     
     # NOT a follow-up (or explicit refresh) - run full pipeline
+    logger.info(f"run_chat_pipeline() called with message: {user_message[:100]}")
     query_type = classify_query_type(user_message)
+    
     if _is_general_chat(user_message):
         general_reply = run_general_chat(user_message, chat_history)
         return {
@@ -686,7 +784,21 @@ def run_chat_pipeline(
             "part1_news_output": None,
             "part2_financial_output": None
         }
-    inferred = infer_ticker_from_message(user_message)
+    
+    # FIXED: Try to infer ticker, but handle vague messages gracefully
+    try:
+        inferred = infer_ticker_from_message(user_message)
+    except RuntimeError as exc:
+        # If inference failed due to vague message, return helpful error
+        return {
+            "ticker": "UNKNOWN",
+            "query_type": "ERROR",
+            "chat_reply": str(exc),
+            "final_result": {"status": "error", "message": str(exc)},
+            "part1_news_output": None,
+            "part2_financial_output": None
+        }
+    
     ticker = inferred["ticker"]
     company_name = _company_name_from_ticker(ticker)
 
