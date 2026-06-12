@@ -222,16 +222,17 @@
             align-items: center;
             gap: 8px;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 2px;
         }
-        .status-header ::before {  
-            content: '';
-            width: 3px;
-            height: 12px;
-            background: #00d4ff;
-            border-radius: 2px;
-            box-shadow: 0 0 6px #00d4ff;     
+        .status-header::before {  
+            content: '' !important;
+            width: 3px !important;
+            height: 12px !important;
+            background: #00d4ff !important;
+            border-radius: 2px !important;
+            box-shadow: 0 0 6px #00d4ff !important;     
         }
+    
         .collapsible-body{
             width: 100%;
             padding: 7px 10px;
@@ -281,19 +282,10 @@
         .watchlist-item {
             background: rgba(255, 255, 255, 0.03);
             padding: 10px;
-            border-radius: 6px;
+            border-radius: 10px;
             display: flex;
             flex-direction: column;
             border: 1px solid rgba(0, 212, 255, 0.05);
-        }
-
-        .watchlist-item::before {
-            content: '';
-            width: 3px;
-            height: 12px;
-            background: #00d4ff;
-            border-radius: 2px;
-            box-shadow: 0 0 6px #00d4ff;     
         }
 
         .watchlist-item:hover {
@@ -316,7 +308,7 @@
         .market-index-card {
             background: rgba(255, 255, 255, 0.04);
             border: 1px solid rgba(0, 212, 255, 0.1);
-            padding: 12px;
+            padding: 8px;
             border-radius: 8px;
             display: flex;
             flex-direction: column;
@@ -407,7 +399,12 @@
 
         .d-value, #market-liquidity {
             color: #ffffff;
+            background: rgba(255, 255, 255, 0.132);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
             font-weight: 600;
+            
         }
 
         .trend-up, #market-trend.trend-up, #market-trend.Bullish {
@@ -472,7 +469,6 @@
             overflow-x: hidden !important;
         }
 
-        /* 2. تنسيق الهيدر الخاص بكِ (يبقى كما هو ولكن نضمن عدم تقلصه) */
         .portfolio-header {
             padding: 12px 13px;
             background: linear-gradient(135deg, rgba(0, 212, 255, 0.08), rgba(0, 102, 255, 0.05));
@@ -488,7 +484,7 @@
             font-weight: 800;
             color: #00d4ff;
             letter-spacing: -0.3px;
-            margin-top: 6px;
+            margin-top: 10px;
         }
 
         .portfolio-grid {
@@ -498,20 +494,19 @@
             margin-top: 10px;
         }
 
-        /* 3.  الحل السحري: جعل قائمة الأسهم المشتراة هي الوحيدة التي تملك سكرول */
         .holdings-list {
             max-height: none !important;    /* let outer container handle scrolling */
             overflow-y: visible !important;
             overflow-x: visible !important;
             margin-bottom: 12px;
             padding-right: 8px;
+            gap: 8px  !important;
             flex-grow: 1;
         }
-
+       
         /* 4. تثبيت صندوق الإدخال والأزرار في الأسفل دائماً */
         .add-item-form, .portfolio-footer-controls {
             flex-shrink: 0 !important;      /* منع الصندوق السفلي من الانضغاط أو الاختفاء */
-            margin-top: auto;                /* دفعه ليكون ملتصقاً بالقعر دائماً فوق شريط المهام */
         }
 
         /* 5. تخصيص شكل شريط التمرير ليكون نحيفاً ومتناسقاً */
@@ -533,7 +528,7 @@
             padding: 8px 10px;
             display: flex;
             flex-direction: column;
-            gap: 3px;
+            gap: 10px
         }
 
         .stat-label {
@@ -557,15 +552,23 @@
         .stat-value.negative {
             color: #ef6b6b;
         }
-
         
         .holding-card {
-            padding: 8px 11px;
+            padding: 10px;
             background: linear-gradient(135deg, rgba(0, 212, 255, 0.05), rgba(0, 102, 255, 0.03));
-            border: 1px solid rgba(0, 212, 255, 0.2);
             border-radius: 10px;
-            transition: all 0.25s ease;
-            position: relative;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(0, 212, 255, 0.05);
+            gap: 8px;
+        }
+        
+        .holding-card:hover {
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.12), rgba(0, 102, 255, 0.08));
+            border-color: rgba(0, 212, 255, 0.4);
+            transform: translateX(3px);
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(0, 212, 255, 0.15);
         }
 
         .holding-stats {
@@ -591,7 +594,7 @@
             flex-direction: column;
             gap: 10px;
             margin-top: 10px;
-            padding: 12px 13px;
+            padding: 8px 8px;
             background: linear-gradient(135deg, rgba(0, 0, 0, 0.25), rgba(0, 0, 0, 0.15));
             border-radius: 11px;
             border: 1px solid rgba(0, 212, 255, 0.12);
@@ -620,7 +623,7 @@
         }
 
         .form-group input {
-            padding: 7px 9px;
+            padding: 6px 6px;
             background: rgba(0, 0, 0, 0.4);
             border: 1px solid rgba(0, 212, 255, 0.15);
             border-radius: 8px;
@@ -644,7 +647,7 @@
         .form-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8px;
+            gap: 10px;
         }
 
         .add-item-form button {
@@ -1031,6 +1034,11 @@
             color: #ffffff !important; 
             box-shadow: 0 0 15px rgba(0, 212, 255, 0.5) !important;
         }
+        #companySelect option {
+            background-color: #0b132b !important; /* لون داكن يتناسب مع الخلفية للواجهة الفاخرة */
+            color: #ffffff !important;
+            padding: 10px !important;
+        }
 
         /* تنسيق زر New Chat */
         #newChatBtn {
@@ -1413,7 +1421,7 @@
 
             <details class="sidebar-section-collapsible">
                 <summary class="status-header">
-                    <span><i class="fas fa-chart-line"></i> MARKET STATUS</span>
+                    <span><i class="fas fa-chart-line"></i>⚙️ MARKET STATUS</span>
                     <div class="header-controls">
                         <span class="live-tag">LIVE</span>
                         <i class="fas fa-chevron-down arrow"></i>
@@ -1481,7 +1489,7 @@
 
             <details class="sidebar-section-collapsible">
                 <summary class="status-header">
-                    <span><i class="fas fa-heart"></i> MY WATCHLIST</span>
+                    <span><i class="fas fa-heart"></i>⚙️ MY WATCHLIST</span>
                     <div class="header-controls">
                         <i class="fas fa-chevron-down arrow"></i>
                     </div>
@@ -1501,7 +1509,7 @@
             <div class="sidebar-divider"></div>
               <details class="sidebar-section-collapsible">
                 <summary class="status-header">
-                    <span><i class="fas fa-briefcase"></i> MY PORTFOLIO</span>
+                    <span><i class="fas fa-briefcase"></i>⚙️ MY PORTFOLIO</span>
                     <div class="header-controls">
                         <i class="fas fa-chevron-down arrow"></i>
                     </div>
@@ -1594,9 +1602,9 @@
                     <div class="msg bot">
                         🤖 <strong>EGX AI Bot Online</strong><br>
                         Ask me about Egyptian stocks:<br>
-                        • "Analyze COMI"<br>
+                        • "What is the latest on COMI"<br>
                         • "Should I buy SWDY?"<br>
-                        • "Sentiment for TMG"
+                        • "Sentiment for TMGH"
                     </div>
                 </div>
                 <div class="composer">
@@ -1646,55 +1654,19 @@
         }
 
         // 2. API & Global Config
-        const API_BASE = "http://127.0.0.1:8000";
+        const API_BASE = "http://localhost:8000";
         const messagesEl = document.getElementById("messages");
         const sendBtn = document.getElementById("sendBtn");
         const inputEl = document.getElementById("messageInput");
         const apiStatusEl = document.getElementById("apiStatus");
         let currentConversationId = null; // معرف المحادثة الحالية المفتوحة
 
-        // 2b. Safe user ID extraction with multiple fallbacks
-        function getCurrentUserId() {
-            const possibleKeys = ["egx_current_user", "user", "currentUser", "authUser", "user_id", "userId"];
-
-            for (const key of possibleKeys) {
-                const value = localStorage.getItem(key);
-                if (!value) continue;
-
-                try {
-                    // Try JSON parsing first
-                    const parsed = JSON.parse(value);
-                    if (parsed && parsed.id) return parsed.id;
-                    if (parsed && parsed.user_id) return parsed.user_id;
-                    if (parsed && parsed.uuid) return parsed.uuid;
-                } catch (e) {
-                    // value is plain text, not JSON - check if it's a UUID
-                    if (typeof value === "string" && /^[0-9a-fA-F-]{36}$/.test(value)) {
-                        return value;
-                    }
-                }
-            }
-
-            console.warn("No user_id found in localStorage; chat memory will be disabled");
-            return null;
-        }
-
-        // 3. User Session check with safe parsing
-        let currentUser = null;
-        try {
-            const userStr = localStorage.getItem('egx_current_user');
-            if (userStr) {
-                currentUser = JSON.parse(userStr);
-            }
-        } catch (e) {
-            console.warn("Could not parse egx_current_user from localStorage:", e);
-        }
-
-        // If no valid user found, redirect to login
+        // 3. User Session check
+        const currentUser = JSON.parse(localStorage.getItem('egx_current_user'));
         if (!currentUser || !currentUser.id) {
             window.location.href = 'index.html';
         }
-        const userId = getCurrentUserId();
+        const userId = currentUser.id;
 
         // 4. UI Initial Setup
         if(document.getElementById('userName')) {
@@ -1712,8 +1684,8 @@
             🤖 <strong>EGX AI Bot Online</strong><br><br>
             Ask me about Egyptian stocks:<br>
             • "What is the latest on COMI?"<br>
-            • "Should I buy Elsewedy?"<br>
-            • "Sentiment for TMG"`;
+            • "Should I buy SWDY?"<br>
+            • "Sentiment for TMGH"`;
             messagesEl.appendChild(welcomeMsg);
             messagesEl.scrollTop = messagesEl.scrollHeight;
             inputEl.focus();
@@ -1721,305 +1693,298 @@
 
         // 5. Companies Data & Population
        const egyptCompanies = [
-            { id: "COMI", name: "البنك التجاري الدولي" },
-            { id: "ETEL", name: "المصرية للاتصالات" },
-            { id: "FWRY", name: "فوري" },
-            { id: "HRHO", name: "هيرميس" },
-            { id: "SWDY", name: "السويدي" },
-            { id: "ORAS", name: "أوراسكوم كونستراكشون" },
-            { id: "ABUK", name: "أبو قير للأسمدة" },
-            { id: "TMGH", name: "طلعت مصطفى" },
-            { id: "ESRS", name: "حديد عز" },
-            { id: "OCDI", name: "سوديك" },
-            { id: "ORAS", name: "أورانج" },
-            { id: "MASR", name: "مدينة مصر" },
-            { id: "JUFO", name: "جهينة للصناعات الغذائية" },
-            { id: "DOMT", name: "دومتي" },
-            { id: "OLFI", name: "عبور لاند" },
-            { id: "EAST", name: "إيسترن كومباني" },
-            { id: "ORWE", name: "النساجون الشرقيون" },
-            { id: "EGAS", name: "غاز مصر" },
-            { id: "EFID", name: "إيديتا للصناعات الغذائية" },
-            { id: "MFPC", name: "موبكو للأسمدة" },
-            { id: "ORAS", name: "أوراسكوم للإنشاء" },
-            { id: "PHDC", name: "بالم هيلز للتعمير" },
-            { id: "QNBA", name: "بنك كيو إن بي الأهلي" },
-            { id: "EFIH", name: "إي فاينانس للاستثمارات" },
-            { id: "FAIT", name: "بنك فيصل الإسلامي" },
-            { id: "AMER", name: "عامر جروب" },
-            { id: "PORT", name: "بورتو جروب" },
-            { id: "EALU", name: "مصر للألومنيوم" },
-            { id: "ADPC", name: "العربية للأدوية" },
-            { id: "DSCW", name: "دايس للملابس" },
-            { id: "MIPH", name: "مينا فارم للأدوية" },
-            { id: "RREI", name: "المصرية لإعادة الإعمار والاستقرار الاستثماري العقاري" },
-            { id: "CIRA", name: "سيرا للتعليم" },
-            { id: "EHDR", name: "المصريين للإسكان والتنمية والتعمير" },
-            { id: "ELKA", name: "القاهرة للإسكان والتعمير" },
-            { id: "OBRI", name: "العبور للاستثمار العقاري" },
-            { id: "ELSH", name: "الشمس للإسكان والتعمير" },
-            { id: "GIHD", name: "الغربية الإسلامية للتنمية العمرانية للإسكان" },
-            { id: "CCRS", name: "الخليج الكندي للاستثمار العقاري العربي" },
-            { id: "HELI", name: "مصر الجديدة للإسكان والتعمير" },
-            { id: "ICID", name: "الدولية للخدمات الطبية والاستثمار والتنمية" },
-            { id: "MENA", name: "مينا للاستثمار السياحي والعقاري" },
-            { id: "NHPS", name: "الوطنية للإسكان للنقابات المهنية" },
-            { id: "COPR", name: "النحاس المصرية للتجارة والاستثمار" },
-            { id: "UNIT", name: "المتحدة للإسكان والتعمير" },
-            { id: "ELEC_r1", name: "الكابلات الكهربائية المصرية" },
-            { id: "EEII_r1", name: "العربية للصناعات الهندسية" },
-            { id: "ENGC", name: "العالمية للاستثمار والتنمية - ايكون" },
-            { id: "GTHE", name: "جلوبر تليكوم القابضة" },
-            { id: "COSG", name: "القاهرة للزيوت والصابون" },
-            { id: "POUL", name: "القاهرة للدواجن" },
-            { id: "SUGR", name: "الدلتا للسكر" },
-            { id: "EPCO", name: "المصرية للمشروعات السياحية العالمية - إيجيبكو" },
-            { id: "ZEOT", name: "الزيوت المستخلصة ومنتجاتها" },
-            { id: "ISMA", name: "الإسماعيلية مصر للدواجن" },
-            { id: "INFI", name: "الشركة العالمية للصناعات الغذائية - فوديكو" },
-            { id: "MPCO", name: "المنصورة للدواجن" },
-            { id: "MOSC", name: "مصر للزيوت والصابون" },
-            { id: "SNFC", name: "الشرقية الوطنية للأمن الغذائي" },
-            { id: "SNFI", name: "سوهاج الوطنية للصناعات الغذائية" },
-            { id: "IRAX", name: "العز الدخيلة للصلب - الإسكندرية" },
-            { id: "CRST", name: "كريست مارك للمقاولات والاستثمار" },
-            { id: "MEGM", name: "الشرق الأوسط لصناعة الزجاج" },
-            { id: "RTVC", name: "الرمس للمقاولات العقارية والاستثمار السياحي - ريمكو" },
-            { id: "ZMID", name: "الزهراء للمعادي للاستثمار والتعمير" },
-            { id: "AMOC", name: "الإسكندرية للزيوت المعدنية - أموك" },
-            { id: "ASCM", name: "أسكوم - شركة أسيوط لتصنيع الأسمنت" },
-            { id: "MOIL", name: "ماريديف - الخدمات الملاحية والبترولية" },
-            { id: "SKPC", name: "سيدي كرير للبتروكيماويات - سيدبك" },
-            { id: "MPRC", name: "الشركة المصرية لمدينة الإنتاج الإعلامي" },
-            { id: "EGSA", name: "المصرية للأقمار الصناعية - نايل سات" },
-            { id: "APSW", name: "يوني راب القابضة والشركات التابعة" },
-            { id: "SPIN", name: "الإسكندرية للغزل والنسيج - سبينالكس" },
-            { id: "ACGC", name: "العربية لحليج الأقطان" },
-            { id: "KABO", name: "النصر للملابس والمنسوجات - كابو" },
-            { id: "NCGC", name: "النيل لحليج الأقطان" },
-            { id: "AMES_r1", name: "الإسكندرية للمجمع الطبي الجديد" },
-            { id: "AXPH", name: "الإسكندرية للأدوية والصناعات الكيماوية" },
-            { id: "ADCI", name: "العربية للأدوية والصناعات الكيماوية - أدكو" },
-            { id: "CPCI", name: "القاهرة للأدوية والصناعات الكيماوية" },
-            { id: "PHAR", name: "المصرية الدولية للصناعات الدوائية - إيبيكو" },
-            { id: "BIOC", name: "جلاكسو سميثكلاين بمصر" },
-            { id: "MPCI", name: "ممفيس للأدوية والصناعات الكيماوية" },
-            { id: "NIPH", name: "النيل للأدوية والصناعات الكيماوية" },
-            { id: "NINH", name: "مستشفى النزهة الدولي" },
-            { id: "OCPH", name: "أكتوبر فارما" },
-            { id: "AMIA", name: "الملتقى العربي للاستثمارات" },
-            { id: "DEIN", name: "الدلتا للتأمين" },
-            { id: "EGBE", name: "البنك المصري الخليجي" },
-            { id: "SAUD", name: "بنك البركة مصر" },
-            { id: "ODIN", name: "أودن للاستثمارات المالية" },
-            { id: "AFDI", name: "الأهلي للاستثمار والتنمية" },
-            { id: "KWIN", name: "القاهرة الوطنية للاستثمار والأوراق المالية" },
-            { id: "NBKE", name: "بنك الكويت الوطني - مصر" },
-            { id: "EXPA_r1", name: "البنك المصري لتنمية الصادرات" },
-            { id: "HDBK", name: "بنك التعمير والإسكان" },
-            { id: "ICLE", name: "الشركة التضامنية للتمويل والتأجير التمويلي - إنكوليس" },
-            { id: "MOIN", name: "المهندس للتأمين" },
-            { id: "ADIB", name: "بنك أبوظبي الإسلامي - مصر" },
-            { id: "QNBE", name: "بنك قطر الوطني" },
-            { id: "CANA", name: "بنك قناة السويس" },
-            { id: "CAED", name: "القاهرة للخدمات التعليمية" },
-            { id: "EALR", name: "العربية لاستصلاح الأراضي" },
+            
             { id: "AALR", name: "الشركة العامة لاستصلاح الأراضي والتنمية والتعمير" },
-            { id: "IFAP", name: "الدولية للمحاصيل الزراعية - إيفاب" },
-            { id: "NEDA", name: "المشروعات الهندسية والتطوير العقاري - نيداب" },
-            { id: "WKOL", name: "وادي كوم أمبو لاستصلاح الأراضي" },
-            { id: "PRCL", name: "الخزف والصيني - شيني" },
-            { id: "VLMR", name: "فالمور للاستثمارات" },
-            { id: "EGCH", name: "الصناعات الكيماوية المصرية - كيما" },
-            { id: "EFIC", name: "المالية والصناعية المصرية" },
-            { id: "KZPC_r1", name: "كفر الزيات للمبيدات والكيماويات" },
-            { id: "MICH", name: "مصر لصناعة الكيماويات" },
-            { id: "SMFR", name: "المصرية للأسمدة والكيماويات - إيجيفيرت" },
-            { id: "PACH", name: "البويات والصناعات الكيماوية - باكين" },
-            { id: "ALCN", name: "الإسكندرية لتداول الحاويات والبضائع" },
-            { id: "CSAG", name: "القناة للتوكيلات الملاحية" },
-            { id: "DCCC", name: "دمياط لتداول الحاويات والبضائع" },
-            { id: "ETRS", name: "المصرية لخدمات النقل والتجارة - إيجيترانس" },
-            { id: "POCO", name: "بورسعيد لتداول الحاويات والبضائع" },
-            { id: "UASG", name: "المجموعة العربية للشحن والتفريغ - أيلود" },
+            { id: "ABUK", name: "أبو قير للأسمدة" },
+            { id: "ACAGC", name: "العربية لإدارة الأصول والتطوير" },
+            { id: "ACAP", name: "إيه كابيتال القابضة" },
+            { id: "ACGC", name: "العربية لحليج الأقطان" },
+            { id: "ACTF", name: "اكت فاينانشيال للاستشارات" },
+            { id: "ACTF", name: "اكت فاينانشيال للاستشارات" },
+            { id: "ADCI", name: "العربية للأدوية والصناعات الكيماوية - أدكو" },
+            { id: "ADIB", name: "بنك أبوظبي الإسلامي - مصر" },
+            { id: "ADPC", name: "الشركة العربية لمنتجات الألبان - باندا" },
+            { id: "ADPC", name: "العربية للأدوية" },
+            { id: "ADRI", name: "العربية للتطوير والاستثمار العقاري" },
+            { id: "AFDI", name: "الأهلي للاستثمار والتنمية" },
             { id: "AFMC", name: "مطاحن ومخابز الإسكندرية" },
-            { id: "EDFM", name: "مطاحن شرق الدلتا" },
-            { id: "EGWA", name: "المستودعات العامة المصرية" },
-            { id: "GSSC", name: "الشركة العامة للصوامع والتخزين" },
-            { id: "WCDF", name: "مطاحن وسط وغرب الدلتا" },
-            { id: "CEFM", name: "مطاحن مصر الوسطى" },
-            { id: "MILS", name: "مطاحن شمال القاهرة" },
-            { id: "SCFM", name: "مطاحن جنوب القاهرة والجيزة" },
-            { id: "UEFM", name: "مطاحن مصر العليا" },
-            { id: "MFSC", name: "مصر للأسواق الحرة" },
-            { id: "EITP", name: "الشركة المصرية للمشروعات السياحية العالمية" },
-            { id: "EGTS", name: "المنتجعات السياحية المصرية" },
-            { id: "GPPL_r1", name: "الذهبية بيراميدز بلازا" },
-            { id: "MHOT", name: "مصر للفنادق" },
-            { id: "ORHD", name: "أوراسكوم للتنمية مصر" },
-            { id: "PHTV", name: "بيراميزا للفنادق والقرى السياحية" },
-            { id: "RMTV", name: "رواد مصر للاستثمار السياحي" },
-            { id: "ROTO", name: "الرواد للسياحة والاستثمار" },
-            { id: "TRTO", name: "عبر المحيطات للسياحة والخدمات" },
-            { id: "EPPK", name: "أخبار الأهرام للطباعة والتغليف" },
-            { id: "SMPP", name: "الشروق الحديثة للطباعة والتغليف" },
-            { id: "SIMO", name: "صناعة الورق الوطنية - سيمو" },
-            { id: "RAKT", name: "الشركة العامة لصناعة الورق - راكتا" },
-            { id: "RUBX", name: "روبكس العالمية لتصنيع البلاستيك والاكريليك" },
-            { id: "RAYA", name: "راية القابضة للاستثمارات المالية" },
-            { id: "SCTS", name: "شركة قناة السويس لتوطين التكنولوجيا" },
-            { id: "ACRO", name: "أكرو مصر للشدات والسقالات المعدنية" },
+            { id: "AFMC", name: "مطاحن ومخابز الإسكندرية" },
+            { id: "AIDC", name: "العربية للاستثمار والتنمية" },
+            { id: "AIND_r1", name: "العربية للاستثمارات والتنمية القابضة" },
+            { id: "AJWA", name: "أجواء للصناعات الغذائية - مصر" },
+            { id: "ALCN", name: "الإسكندرية لتداول الحاويات والبضائع" },
+            { id: "ALEX", name: "أسمنت الإسكندرية" },
             { id: "ALUM", name: "العربية للألومنيوم" },
+            { id: "AMER", name: "عامر جروب" },
+            { id: "AMES_r1", name: "الإسكندرية للمجمع الطبي الجديد" },
+            { id: "AMIA", name: "الملتقى العربي للاستثمارات" },
+            { id: "AMOC", name: "إسكندرية للزيوت المعدنية - أموك" },
+            { id: "AMPI", name: "نوفيدا للاستثمار والتكنولوجيا - أمبي" },
+            { id: "APPC", name: "المتطورة لتعبئة الأدوية" },
+            { id: "APSW", name: "يوني راب القابضة والشركات التابعة" },
+            { id: "ARAB", name: "المطورون العرب القابضة" },
+            { id: "ARCC", name: "العربية للاسمنت" },
+            { id: "ARPI", name: "العربية لمنتجات الصخور والبلاستيك" },
+            { id: "ARVA", name: "العربية للمحابس" },
+            { id: "ASCM", name: "أسكوم - شركة أسيوط لتصنيع الأسمنت" },
+            { id: "ASPI", name: "أسباير كابيتال القابضة للاستثمارات المالية" },
+            { id: "ATLC", name: "التوفيق للتأجير التمويلي - أيه تي ليس" },
+            { id: "ATQA", name: "مصر لإنتاج الصلب - عتاقة" },
+            { id: "AXPH", name: "الإسكندرية للأدوية والصناعات الكيماوية" },
+            { id: "BIDI", name: "البدر للاستثمار والتنمية" },
+            { id: "BIGP", name: "البربري للاستثمار جروب" },
+            { id: "BINV", name: "بي إنفستمنتس القابضة" },
+            { id: "BIOC", name: "جلاكسو سميثكلاين بمصر" },
+            { id: "BONY", name: "بنيان للتنمية والتجارة" },
+            { id: "BQDC", name: "بنك القاهرة" },
+            { id: "BTFH", name: "بلتون المالية القابضة" },
+            { id: "CAED", name: "القاهرة للخدمات التعليمية" },
+            { id: "CANA", name: "بنك قناة السويس" },
+            { id: "CCAP", name: "موبكو - القلعة للاستشارات المالية القابضة" },
+            { id: "CCRS", name: "الخليج الكندي للاستثمار العقاري العربي" },
+            { id: "CEFM", name: "مطاحن مصر الوسطى" },
+            { id: "CERA", name: "العالمية للبورسلين والسيراميك - ريماس" },
+            { id: "CFGH", name: "كونكريت فاشون جروب للاستثمارات" },
+            { id: "CICH", name: "سي آي كابيتال القابضة للاستثمارات المالية" },
+            { id: "CIEB", name: "كريدي أجريكول - مصر" },
+            { id: "CIRA", name: "سيرا للتعليم" },
+            { id: "CLHO_r1", name: "مستشفى كليوباترا" },
+            { id: "CNFN", name: "كونتكت المالية القابضة" },
+            { id: "COMI", name: "البنك التجاري الدولي" },
+            { id: "COPR", name: "النحاس المصرية للتجارة والاستثمار" },
+            { id: "COSG", name: "القاهرة للزيوت والصابون" },
+            { id: "CPCI", name: "القاهرة للأدوية والصناعات الكيماوية" },
+            { id: "CPME", name: "كاتاليست بارتنرز الشرق الأوسط" },
+            { id: "CRST", name: "كريست مارك للمقاولات والاستثمار" },
+            { id: "CSAG", name: "القناة للتوكيلات الملاحية" },
             { id: "DAPH", name: "المستشارون التطويريون للمشروعات العقارية والتنمية والتخطيط" },
+            { id: "DCCC", name: "دمياط لتداول الحاويات والبضائع" },
+            { id: "DCRC", name: "الدلتا للإنشاء والتعمير" },
+            { id: "DEIN", name: "الدلتا للتأمين" },
+            { id: "DIFC", name: "ديفكو 2 للاستثمار" },
+            { id: "DGTZ", name: "ديجيتيز للاستثمار والتكنولوجيا" },
+            { id: "DOMT", name: "دومتي" },
+            { id: "DSCW", name: "دايس للملابس" },
+            { id: "DTPP", name: "الدلتا للطباعة والتغليف" },
+            { id: "EALR", name: "العربية لاستصلاح الأراضي" },
+            { id: "EALU", name: "مصر للألومنيوم" },
+            { id: "EASB", name: "المصرية العربية للمشروعات والتنمية - إياك" },
+            { id: "EAST", name: "إيسترن كومباني" },
+            { id: "EBSC", name: "أصول للوساطة في الأوراق المالية" },
+            { id: "ECAP", name: "مصر لإنتاج السيراميك - جيما" },
+            { id: "EDFM", name: "مطاحن شرق الدلتا" },
+            { id: "EEII_r1", name: "العربية للصناعات الهندسية" },
+            { id: "EFIC", name: "المالية والصناعية المصرية" },
+            { id: "EFID", name: "إيديتا للصناعات الغذائية" },
+            { id: "EFIH", name: "إي فاينانس للاستثمارات" },
             { id: "EGAL", name: "الألومنيوم المصرية" },
-            { id: "IRON_r1", name: "المصرية للحديد والصلب" },
+            { id: "EGAS", name: "غاز مصر" },
+            { id: "EGBE", name: "البنك المصري الخليجي" },
+            { id: "EGCH", name: "الصناعات الكيماوية المصرية - كيما" },
+            { id: "EGSA", name: "المصرية للأقمار الصناعية - نايل سات" },
+            { id: "EGTS", name: "المنتجعات السياحية المصرية" },
+            { id: "EGWA", name: "المستودعات العامة المصرية" },
+            { id: "EHDR", name: "المصريين للإسكان والتنمية والتعمير" },
+            { id: "EITP", name: "الشركة المصرية للمشروعات السياحية العالمية" },
+            { id: "ELKA", name: "القاهرة للإسكان والتعمير" },
+            { id: "ELNA", name: "النصر لتصنيع الحاصلات الزراعية" },
+            { id: "ELSH", name: "الشمس للإسكان والتعمير" },
+            { id: "ELWA", name: "الوادي العالمية للاستثمار والتنمية" },
+            { id: "EMFD", name: "إعمار مصر للتنمية" },
+            { id: "ENGC", name: "العالمية للاستثمار والتنمية - ايكون" },
+            { id: "EPCO", name: "المصرية للمشروعات السياحية العالمية - إيجيبكو" },
+            { id: "EPPK", name: "أخبار الأهرام للطباعة والتغليف" },
+            { id: "EOSB", name: "العروبة للوساطة في الأوراق المالية" },
+            { id: "ESAC_r1", name: "إيجيساكوم للمقاولات" },
+            { id: "ESRS", name: "حديد عز" },
+            { id: "ETEL", name: "المصرية للاتصالات" },
+            { id: "ETRS", name: "المصرية لخدمات النقل والتجارة - إيجيترانس" },
+            { id: "EXPA_r1", name: "البنك المصري لتنمية الصادرات" },
+            { id: "FAIT", name: "بنك فيصل الإسلامي" },
+            { id: "FCMD", name: "فيوتشر كير للصناعات الطبية" },
+            { id: "FERC", name: "فيركيم لمستلزمات الإنتاج والأسمدة" },
+            { id: "FIRE", name: "الأولى للاستثمار والتنمية العقارية" },
+            { id: "FNAR", name: "الفنار للمقاولات والعمومية والتجارة والاستيراد والتصدير" },
+            { id: "FTNS", name: "فيتنس برايم للأندية الصحية" },
+            { id: "FWRY", name: "فوري" },
+            { id: "GBCO", name: "جي بي كورب" },
+            { id: "GDWA", name: "جدوى للتنمية الصناعية" },
+            { id: "GEOS", name: "جيوس للتجارة والمقاولات" },
+            { id: "GETO", name: "جينيال تورز للسياحة" },
             { id: "GGCC", name: "الجيزة العامة للمقاولات والاستثمار العقاري" },
+            { id: "GIHD", name: "الغربية الإسلامية للتنمية العمرانية للإسكان" },
+            { id: "GMCI", name: "المجموعة الهندسية للصناعات والمسابح - جي إم سي" },
+            { id: "GOCO", name: "غولدن كوست للاستثمار السياحي" },
+            { id: "GPIM", name: "المجموعة البترولية الاستثمارية - جي بي آي" },
+            { id: "GPPL_r1", name: "الذهبية بيراميدز بلازا" },
+            { id: "GRCA", name: "جراند للاستثمار القابضة المالية" },
+            { id: "GSSC", name: "الشركة العامة للصوامع والتخزين" },
+            { id: "GTHE", name: "جلوبر تليكوم القابضة" },
+            { id: "GTEX", name: "جي تكس للتجارة والصناعة" },
+            { id: "GTWL", name: "جولدن تكس للأصواف" },
+            { id: "HAVC", name: "حسن علام للاستثمار المغامر" },
+            { id: "HCFI", name: "المجموعة الطبية المصرية - مجموعة لكح" },
+            { id: "HDBK", name: "بنك التعمير والإسكان" },
+            { id: "HDST", name: "هيدج ستون للاستثمار" },
+            { id: "HELI", name: "مصر الجديدة للإسكان والتعمير" },
+            { id: "HRHO", name: "هيرميس" },
+            { id: "IBCT", name: "الشركة الدولية لتوكيلات التجارة - آي بي سي" },
+            { id: "ICFC", name: "الشركة الدولية للأسمدة والكيماويات" },
+            { id: "ICID", name: "الدولية للخدمات الطبية والاستثمار والتنمية" },
+            { id: "ICLE", name: "الشركة التضامنية للتمويل والتأجير التمويلي - إنكوليس" },
+            { id: "IDRE", name: "الشركة الحديثة للإسكان والتعمير" },
             { id: "IEEC", name: "العالمية للهندسة والمقاولات - آي إي إي" },
+            { id: "IFAP", name: "الدولية للمحاصيل الزراعية - إيفاب" },
+            { id: "INEG", name: "المجموعة المتكاملة للأعمال الهندسية" },
+            { id: "INFI", name: "الشركة العالمية للصناعات الغذائية - فوديكو" },
+            { id: "IRAX", name: "العز الدخيلة للصلب - الإسكندرية" },
+            { id: "IRON_r1", name: "المصرية للحديد والصلب" },
+            { id: "ISMA", name: "الإسماعيلية مصر للدواجن" },
+            { id: "ISPH", name: "ابن سينا فارما" },
+            { id: "ISMQ", name: "الحديد والصلب للمناجم والمحاجر" },
+            { id: "JUFO", name: "جهينة للصناعات الغذائية" },
+            { id: "KABO", name: "النصر للملابس والمنسوجات - كابو" },
+            { id: "KORA", name: "قرّة للطاقة والمشروعات الاستثمارية" },
+            { id: "KRDI", name: "نهر الخير للتنمية والاستثمار الزراعي والبيئي" },
+            { id: "KWIN", name: "القاهرة الوطنية للاستثمار والأوراق المالية" },
+            { id: "KZPC_r1", name: "كفر الزيات للمبيدات والكيماويات" },
+            { id: "LCSW", name: "ليسيكو مصر لإنتاج السيراميك والبورسلين" },
+            { id: "LUTS", name: "لوتس للاستثمارات والتنمية الزراعية" },
+            { id: "MAAL", name: "مرسيليا المصرية الخليجية للاستثمار العقاري" },
+            { id: "MASR", name: "مدينة مصر" },
+            { id: "MBEG", name: "إم بي للهندسة" },
             { id: "MBSC", name: "مصر بني سويف للأسمنت" },
             { id: "MCQE_r1", name: "مصر للأسمنت - قنا" },
-            { id: "WATP", name: "الشركة الحديثة للمواد العازلة - بيتومود" },
-            { id: "NCCW", name: "النصر للأعمال المدنية" },
-            { id: "SCEM_r1", name: "سيناء للأسمنت" },
-            { id: "SUCE", name: "هايدلبرج ماتيريالز - أسمنت السويس" },
-            { id: "TORA", name: "أسمنت طرة" },
-            { id: "UEGC", name: "الصعيد العامة للمقاولات والاستثمار العقاري" },
-            { id: "AIND_r1", name: "العربية للاستثمارات والتنمية القابضة" },
-            { id: "DCRC", name: "الدلتا للإنشاء والتعمير" },
-            { id: "EBSC", name: "أصول للوساطة في الأوراق المالية" },
-            { id: "GTWL", name: "جولدن تكس للأصواف" },
-            { id: "SDTI", name: "شارم دريمز للاستثمار السياحي" },
-            { id: "ECAP", name: "مصر لإنتاج السيراميك - جيما" },
-            { id: "ALEX", name: "أسمنت الإسكندرية" },
-            { id: "SVCE", name: "جنوب الوادي للأسمنت" },
-            { id: "CFGH", name: "كونكريت فاشون جروب للاستثمارات" },
-            { id: "AJWA", name: "أجواء للصناعات الغذائية - مصر" },
-            { id: "CIEB", name: "كريدي أجريكول - مصر" },
-            { id: "NAHO", name: "نعيم القابضة للاستثمارات" },
-            { id: "SAIB", name: "الشركة العربية المصرفية الدولية - بنك سايب" },
-            { id: "TYCN", name: "تايكون القابضة للاستثمارات المالية" },
-            { id: "ATQA", name: "مصر لإنتاج الصلب - عتاقة" },
-            { id: "CERA", name: "العالمية للبورسلين والسيراميك - ريماس" },
-            { id: "EASB", name: "المصرية العربية للمشروعات والتنمية - إياك" },
-            { id: "ELNA", name: "النصر لتصنيع الحاصلات الزراعية" },
-            { id: "ARVA", name: "العربية للمحابس" },
-            { id: "HCFI", name: "المجموعة الطبية المصرية - مجموعة لكح" },
-            { id: "LCSW", name: "ليسيكو مصر لإنتاج السيراميك والبورسلين" },
-            { id: "ADPC", name: "الشركة العربية لمنتجات الألبان - باندا" },
-            { id: "GMCI", name: "المجموعة الهندسية للصناعات والمسابح - جي إم سي" },
-            { id: "NARE", name: "النعيم للاستثمار العقاري" },
-            { id: "GBCO", name: "جي بي كورب" },
-            { id: "UNIP", name: "العالمية للتعبئة والتغليف - يونيباك" },
-            { id: "SEIG", name: "سعودي مصر للاستثمار والتمويل" },
-            { id: "BTFH", name: "بلتون المالية القابضة" },
-            { id: "PRMH", name: "برايم القابضة للاستثمارات المالية" },
-            { id: "NDRL", name: "الوطنية للحفر" },
-            { id: "AREH", name: "المجموعة العقارية المصرية" },
-            { id: "DTPP", name: "الدلتا للطباعة والتغليف" },
-            { id: "SPHT", name: "شمس الأهرام للمشروعات العقارية والسياحية" },
-            { id: "ASPI", name: "أسباير كابيتال القابضة للاستثمارات المالية" },
-            { id: "BIDI", name: "البدر للاستثمار والتنمية" },
-            { id: "EOSB", name: "العروبة للوساطة في الأوراق المالية" },
-            { id: "CCAP", name: "موبكو - القلعة للاستشارات المالية القابضة" },
-            { id: "GRCA", name: "جراند للاستثمار القابضة المالية" },
-            { id: "ICFC", name: "الشركة الدولية للأسمدة والكيماويات" },
-            { id: "AMPI", name: "نوفيدا للاستثمار والتكنولوجيا - أمبي" },
-            { id: "BIGP", name: "البربري للاستثمار جروب" },
-            { id: "UTOP", name: "يوتوبيا للاستثمار العقاري" },
-            { id: "APPC", name: "المتطورة لتعبئة الأدوية" },
-            { id: "PTCC", name: "فرعون تيك لتقنية النظم والمعلومات" },
-            { id: "MKIT", name: "ميتاللو للصناعات المعدنية والغذائية" },
-            { id: "FERC", name: "فيركيم لمستلزمات الإنتاج والأسمدة" },
-            { id: "MISR", name: "إيجي ستون لصناعة الرخام والجرانيت" },
-            { id: "FIRE", name: "الأولى للاستثمار والتنمية العقارية" },
-            { id: "IDRE", name: "الشركة الحديثة للإسكان والتعمير" },
-            { id: "GPIM", name: "المجموعة البترولية الاستثمارية - جي بي آي" },
-            { id: "MEPA", name: "الطبية للتعبئة والتغليف" },
-            { id: "MAAL", name: "مرسيليا المصرية الخليجية للاستثمار العقاري" },
-            { id: "RKAZ", name: "ركاز القابضة للاستثمارات المالية" },
-            { id: "OIH", name: "أوراسكوم للاستثمار القابضة" },
-            { id: "ELWA", name: "الوادي العالمية للاستثمار والتنمية" },
-            { id: "UBEE", name: "بنك الاتحاد الوطني - مصر" },
-            { id: "IBCT", name: "الشركة الدولية لتوكيلات التجارة - آي بي سي" },
-            { id: "BQDC", name: "بنك القاهرة" },
-            { id: "MTIE", name: "إم تي آي للتشجير والتنمية" },
-            { id: "NAPR", name: "الشركة الوطنية للطباعة" },
-            { id: "CNFN", name: "كونتكت المالية القابضة" },
-            { id: "ATLC", name: "التوفيق للتأجير التمويلي - أيه تي ليس" },
-            { id: "TAQA", name: "طاقة عربية" },
-            { id: "CICH", name: "سي آي كابيتال القابضة للاستثمارات المالية" },
-            { id: "BINV", name: "بي إنفستمنتس القابضة" },
-            { id: "EMFD", name: "إعمار مصر للتنمية" },
-            { id: "DIFC", name: "ديفكو 2 للاستثمار" },
-            { id: "RACC", name: "راية لخدمات مراكز الاتصالات" },
-            { id: "RMDA", name: "العاشر من رمضان للصناعات الدوائية - راميدا" },
-            { id: "MMAT", name: "مرسى مرسى علم للتنمية السياحية" },
-            { id: "FCMD", name: "فيوتشر كير للصناعات الطبية" },
-            { id: "AIFI", name: "أطلس للاستثمار والصناعات الغذائية" },
-            { id: "MOED", name: "المصرية لنظم التعليم الحديثة" },
-            { id: "ARCC", name: "العربية للاسمنت" },
-            { id: "FNAR", name: "الفنار للمقاولات والعمومية والتجارة والاستيراد والتصدير" },
-            { id: "GOCO", name: "غولدن كوست للاستثمار السياحي" },
-            { id: "VERT", name: "فيرتيكا للبرمجيات" },
-            { id: "TRST", name: "ثقة لإدارة الأعمال والتنمية" },
-            { id: "SIPC", name: "سبأ للأدوية والصناعات الكيماوية" },
-            { id: "MBEG", name: "إم بي للهندسة" },
-            { id: "ISPH", name: "ابن سينا فارما" },
-            { id: "INEG", name: "المجموعة المتكاملة للأعمال الهندسية" },
-            { id: "ADRI", name: "العربية للتطوير والاستثمار العقاري" },
-            { id: "GETO", name: "جينيال تورز للسياحة" },
-            { id: "ESAC_r1", name: "إيجيساكوم للمقاولات" },
-            { id: "ARAB", name: "المطورون العرب القابضة" },
-            { id: "ACTF", name: "اكت فاينانشيال للاستشارات" },
-            { id: "CLHO_r1", name: "مستشفى كليوباترا" },
-            { id: "ARPI", name: "العربية لمنتجات الصخور والبلاستيك" },
-            { id: "KRDI", name: "نهر الخير للتنمية والاستثمار الزراعي والبيئي" },
-            { id: "UPMS", name: "نقابة الصيادلة المتحدين" },
-            { id: "ACAMD", name: "العربية لإدارة الأصول والتطوير" },
-            { id: "SPMD", name: "سبيد ميديكال" },
-            { id: "OFH", name: "أو بي إتش للاستشارات المالية" },
-            { id: "TALM", name: "تعليم لخدمات الإدارة" },
             { id: "MCRO", name: "ماكرو كابيتال - مجموعة ماكرو للمستحضرات الطبية" },
-            { id: "ISMQ", name: "الحديد والصلب للمناجم والمحاجر" },
-            { id: "TANM", name: "تنمية للاستثمار العقاري" },
-            { id: "GDWA", name: "جدوى للتنمية الصناعية" },
-            { id: "PRDC", name: "رواد الهندسة الحديثة - مجموعة بيونيرز بروبرتيز" },
-            { id: "ACAP", name: "إيه كابيتال القابضة" },
-            { id: "LUTS", name: "لوتس للاستثمارات والتنمية الزراعية" },
-            { id: "FTNS", name: "فيتنس برايم للأندية الصحية" },
-            { id: "DGTZ", name: "ديجيتيز للاستثمار والتكنولوجيا" },
-            { id: "VALU", name: "فاليو للتمويل الاستهلاكي" },
+            { id: "MEGM", name: "الشرق الأوسط لصناعة الزجاج" },
+            { id: "MENA", name: "مينا للاستثمار السياحي والعقاري" },
+            { id: "MEPA", name: "الطبية للتعبئة والتغليف" },
+            { id: "MFPC", name: "موبكو للأسمدة" },
+            { id: "MFSC", name: "مصر للأسواق الحرة" },
+            { id: "MICH", name: "مصر لصناعة الكيماويات" },
+            { id: "MILS", name: "مطاحن شمال القاهرة" },
+            { id: "MIPH", name: "مينا فارم للأدوية" },
+            { id: "MISR", name: "إيجي ستون لصناعة الرخام والجرانيت" },
+            { id: "MMAT", name: "مرسى مرسى علم للتنمية السياحية" },
+            { id: "MOED", name: "المصرية لنظم التعليم الحديثة" },
+            { id: "MOIL", name: "ماريديف - الخدمات الملاحية والبترولية" },
+            { id: "MOIN", name: "المهندس للتأمين" },
+            { id: "MOSC", name: "مصر للزيوت والصابون" },
+            { id: "MPCI", name: "ممفيس للأدوية والصناعات الكيماوية" },
+            { id: "MPCO", name: "المنصورة للدواجن" },
+            { id: "MPRC", name: "الشركة المصرية لمدينة الإنتاج الإعلامي" },
+            { id: "MTIE", name: "إم تي آي للتشجير والتنمية" },
+            { id: "NAHO", name: "نعيم القابضة للاستثمارات" },
+            { id: "NAPR", name: "الشركة الوطنية للطباعة" },
+            { id: "NARE", name: "النعيم للاستثمار العقاري" },
+            { id: "NBKE", name: "بنك الكويت الوطني - مصر" },
+            { id: "NCGC", name: "النيل لحليج الأقطان" },
+            { id: "NCCW", name: "النصر للأعمال المدنية" },
+            { id: "NEDA", name: "المشروعات الهندسية والتطوير العقاري - نيداب" },
+            { id: "NHPS", name: "الوطنية للإسكان للنقابات المهنية" },
+            { id: "NINH", name: "مستشفى النزهة الدولي" },
+            { id: "NIPH", name: "النيل للأدوية والصناعات الكيماوية" },
+            { id: "OBRI", name: "العبور للاستثمار العقاري" },
+            { id: "OCDI", name: "سوديك" },
+            { id: "OCPH", name: "أكتوبر فارما" },
+            { id: "ODIN", name: "أودن للاستثمارات المالية" },
+            { id: "OFH", name: "أو بي إتش للاستشارات المالية" },
+            { id: "OIH", name: "أوراسكوم للاستثمار القابضة" },
+            { id: "OLFI", name: "عبور لاند" },
+            { id: "ORAS", name: "أوراسكوم كونستراكشون" },
+            { id: "ORAS", name: "أورانج" },
+            { id: "ORAS", name: "أوراسكوم للإنشاء" },
+            { id: "ORHD", name: "أوراسكوم للتنمية مصر" },
+            { id: "ORWE", name: "النساجون الشرقيون" },
+            { id: "PACH", name: "البويات والصناعات الكيماوية - باكين" },
+            { id: "PHAR", name: "المصرية الدولية للصناعات الدوائية - إيبيكو" },
+            { id: "PHDC", name: "بالم هيلز للتعمير" },
             { id: "PHGC", name: "بريميوم هيلثكير جروب" },
-            { id: "GTEX", name: "جي تكس للتجارة والصناعة" },
+            { id: "PHTV", name: "بيراميزا للفنادق والقرى السياحية" },
+            { id: "POCO", name: "بورسعيد لتداول الحاويات والبضائع" },
+            { id: "PORT", name: "بورتو جروب" },
+            { id: "POUL", name: "القاهرة للدواجن" },
+            { id: "PRCL", name: "الخزف والصيني - شيني" },
+            { id: "PRDC", name: "رواد الهندسة الحديثة - مجموعة بيونيرز بروبرتيز" },
+            { id: "PRMH", name: "برايم القابضة للاستثمارات المالية" },
+            { id: "PTCC", name: "فرعون تيك لتقنية النظم والمعلومات" },
+            { id: "QNBA", name: "بنك كيو إن بي الأهلي" },
+            { id: "QNBE", name: "بنك قطر الوطني" },
+            { id: "RACC", name: "راية لخدمات مراكز الاتصالات" },
+            { id: "RAKT", name: "الشركة العامة لصناعة الورق - راكتا" },
+            { id: "RAYA", name: "راية القابضة للاستثمارات المالية" },
+            { id: "RKAZ", name: "ركاز القابضة للاستثمارات المالية" },
+            { id: "RMDA", name: "العاشر من رمضان للصناعات الدوائية - راميدا" },
+            { id: "RMTV", name: "رواد مصر للاستثمار السياحي" },
+            { id: "ROTO", name: "الرواد للسياحة والاستثمار" },
+            { id: "RREI", name: "المصرية لإعادة الإعمار والاستقرار الاستثماري العقاري" },
+            { id: "RTVC", name: "الرمس للمقاولات العقارية والاستثمار السياحي - ريمكو" },
+            { id: "RUBX", name: "روبكس العالمية لتصنيع البلاستيك والاكريليك" },
+            { id: "SAIB", name: "الشركة العربية المصرفية الدولية - بنك سايب" },
+            { id: "SAUD", name: "بنك البركة مصر" },
+            { id: "SCEM_r1", name: "سيناء للأسمنت" },
+            { id: "SCFM", name: "مطاحن جنوب القاهرة والجيزة" },
+            { id: "SCTS", name: "شركة قناة السويس لتوطين التكنولوجيا" },
+            { id: "SDTI", name: "شارم دريمز للاستثمار السياحي" },
+            { id: "SEIG", name: "سعودي مصر للاستثمار والتمويل" },
             { id: "SFWA", name: "مستشفى الصفوة" },
-            { id: "GGRN", name: "جو جرين للاستثمار الزراعي" },
+            { id: "SIMO", name: "صناعة الورق الوطنية - سيمو" },
+            { id: "SIPC", name: "سبأ للأدوية والصناعات الكيماوية" },
+            { id: "SKPC", name: "سيدي كرير للبتروكيماويات - سيدبك" },
             { id: "SLAR", name: "سولار سول للطاقة" },
-            { id: "HBCO", name: "هيبكو للصناعات" },
-            { id: "CPME", name: "كاتاليست بارتنرز الشرق الأوسط" },
+            { id: "SMFR", name: "المصرية للأسمدة والكيماويات - إيجيفيرت" },
+            { id: "SMPP", name: "الشروق الحديثة للطباعة والتغليف" },
+            { id: "SNFC", name: "الشرقية الوطنية للأمن الغذائي" },
+            { id: "SNFI", name: "سوهاج الوطنية للصناعات الغذائية" },
+            { id: "SPHT", name: "شمس الأهرام للمشروعات العقارية والسياحية" },
+            { id: "SPIN", name: "الإسكندرية للغزل والنسيج - سبينالكس" },
+            { id: "SPMD", name: "سبيد ميديكال" },
+            { id: "SUCE", name: "هايدلبرج ماتيريالز - أسمنت السويس" },
+            { id: "SUGR", name: "الدلتا للسكر" },
+            { id: "SVCE", name: "جنوب الوادي للأسمنت" },
+            { id: "SWDY", name: "السويدي" },
+            { id: "TALM", name: "تعليم لخدمات الإدارة" },
+            { id: "TANM", name: "تنمية للاستثمار العقاري" },
+            { id: "TAQA", name: "طاقة عربية" },
+            { id: "TMGH", name: "طلعت مصطفى" },
+            { id: "TORA", name: "أسمنت طرة" },
+            { id: "TRST", name: "ثقة لإدارة الأعمال والتنمية" },
+            { id: "TRTO", name: "عبر المحيطات للسياحة والخدمات" },
             { id: "TWSA", name: "تواصل للتخصيم" },
-            { id: "KORA", name: "قرّة للطاقة والمشروعات الاستثمارية" },
-            { id: "GEOS", name: "جيوس للتجارة والمقاولات" },
-            { id: "HDST", name: "هيدج ستون للاستثمار" },
-            { id: "BONY", name: "بنيان للتنمية والتجارة" },
-            { id: "HAVC", name: "حسن علام للاستثمار المغامر" },
-            { id: "AIDC", name: "العربية للاستثمار والتنمية" }
+            { id: "TYCN", name: "تايكون القابضة للاستثمارات المالية" },
+            { id: "UASG", name: "المجموعة العربية للشحن والتفريغ - أيلود" },
+            { id: "UBEE", name: "بنك الاتحاد الوطني - مصر" },
+            { id: "UEGC", name: "الصعيد العامة للمقاولات والاستثمار العقاري" },
+            { id: "UEFM", name: "مطاحن مصر العليا" },
+            { id: "UNIP", name: "العالمية للتعبئة والتغليف - يونيباك" },
+            { id: "UNIT", name: "المتحدة للإسكان والتعمير" },
+            { id: "UPMS", name: "نقابة الصيادلة المتحدين" },
+            { id: "UTOP", name: "يوتوبيا للاستثمار العقاري" },
+            { id: "VALU", name: "فاليو للتمويل الاستهلاكي" },
+            { id: "VERT", name: "فيرتيكا للبرمجيات" },
+            { id: "VLMR", name: "فالمور للاستثمارات" },
+            { id: "WATP", name: "الشركة الحديثة للمواد العازلة - بيتومود" },
+            { id: "WCDF", name: "مطاحن وسط وغرب الدلتا" },
+            { id: "WKOL", name: "وادي كوم أمبو لاستصلاح الأراضي" },
+            { id: "ZEOT", name: "الزيوت المستخلصة ومنتجاتها" },
+            { id: "ZMID", name: "الزهراء للمعادي للاستثمار والتعمير" }
         ];
         
-        function populateCompanies() {
+      function populateCompanies() {
             const companyList = document.getElementById('companyList');
             const companyInput = document.getElementById('companySelect');
             if (!companyList) return;
             
             companyList.innerHTML = ''; // تفريغ القائمة قبل الملء
-            egyptCompanies.sort((a, b) => a.name.localeCompare(b.name));
-            
+                        
             egyptCompanies.forEach(company => {
                 const option = document.createElement('option');
                 option.value = `${company.id} - ${company.name}`;
                 companyList.appendChild(option);
             });
+            egyptCompanies.sort((a, b) => a.name.localeCompare(b.name, 'en', { sensitivity: 'base' }));
 
             if (companyInput) {
-                // قمنا بتغيير الحدث ليكون مرناً وقابلاً للتغيير متى شئتِ
                 companyInput.addEventListener('change', function() {
                     if(this.value) {
                         // 1. استخراج الـ Ticker الصافي (مثل ETEL أو COMI)
@@ -2036,8 +2001,7 @@
                             inputEl.focus();
                         }
                         
-                        // 4.  الحل السحري: تصفير خانة الإدخال فوراً بعد الاختيار
-                        // هذا يسمح لكِ بإعادة فتح القائمة وتغيير الشركة إلى أي رمز آخر متى شئتِ دون تجمد
+                        // 4. تصفير خانة الإدخال فوراً بعد الاختيار لمنع التجمد
                         this.value = ''; 
                     }
                 });
@@ -2078,9 +2042,8 @@
             const drawdownEl = document.getElementById("drawdown");
             const styleEl = document.getElementById("style");
 
-            const payload = {
+            return {
                 message: message,
-                user_id: userId,
                 max_news: Number(maxNewsEl ? maxNewsEl.value : 20),
                 user_risk_profile: riskProfileEl ? riskProfileEl.value : null,
                 risk_answers: {
@@ -2089,13 +2052,6 @@
                     style: styleEl ? styleEl.value : "balanced"
                 }
             };
-            
-            console.log("Sending chat:", {
-                message: payload.message,
-                user_id: payload.user_id
-            });
-            
-            return payload;
         }
 
         // 7. API Calls & Core System
@@ -2122,29 +2078,19 @@
 
         // Watchlist Functions
         async function loadWatchlist() {
-            try {
-                const response = await fetch(`${API_BASE}/watchlist?user_id=${userId}`);
-                if (!response.ok) {
-                    console.error(`API error: ${response.status} ${response.statusText}`);
-                    const errorText = await response.text();
-                    console.error("Response:", errorText);
-                    return;
-                }
-                const tickers = await response.json();
-                
-                const container = document.getElementById('watchlistContainer');
-                container.innerHTML = ''; // تنظيف العناصر القديمة لمنع التكرار
-                
-                tickers.forEach(item => {
-                    container.innerHTML += `
-                        <div class="watchlist-item" onclick="analyzeTicker('${item.ticker}')">
-                            <span class="ticker-badge">${item.ticker}</span>
-                            <i class="fas fa-times remove-icon" onclick="removeFromWatchlist('${item.id}')"></i>
-                        </div>`;
-                });
-            } catch (e) {
-                console.error('loadWatchlist error:', e);
-            }
+            const response = await fetch('/api/watchlist/');
+            const tickers = await response.json();
+            
+            const container = document.getElementById('watchlistContainer');
+            container.innerHTML = ''; // تنظيف العناصر القديمة لمنع التكرار
+            
+            tickers.forEach(item => {
+                container.innerHTML += `
+                    <div class="watchlist-item" onclick="analyzeTicker('${item.ticker}')">
+                        <span class="ticker-badge">${item.ticker}</span>
+                        <i class="fas fa-times remove-icon" onclick="removeFromWatchlist('${item.id}')"></i>
+                    </div>`;
+            });
         }
     
        function addToWatchlist() {
@@ -2217,13 +2163,6 @@
             
             try {
                 const res = await fetch(`${API_BASE}/portfolio?user_id=${userId}`);
-                if (!res.ok) {
-                    console.error(`API error: ${res.status} ${res.statusText}`);
-                    const errorText = await res.text();
-                    console.error("Response:", errorText);
-                    container.innerHTML = '<div class="empty-state" style="color:#ef6b6b">⚠️ Error loading portfolio</div>';
-                    return;
-                }
                 const data = await res.json();
                 
                 if(!data || data.length === 0) {
@@ -2391,17 +2330,9 @@
                 });
 
                 loadingMsg.remove(); // حذف رسالة التحميل بعد استلام الرد
-                
-                if (!response.ok) {
-                    console.error(`API error: ${response.status} ${response.statusText}`);
-                    const errorText = await response.text();
-                    console.error("Error response:", errorText);
-                    throw new Error(`Server error: ${response.status}`);
-                }
-                
                 const data = await response.json();
 
-                if (data.status !== "success") throw new Error(data?.error || "Request failed");
+                if (!response.ok || data.status !== "success") throw new Error(data?.error || "Request failed");
 
                 // 5. استخراج البيانات والردود والقرارات الاستثمارية للـ Bot
                 const finalResult = data.final_result || {};
