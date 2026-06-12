@@ -1,555 +1,572 @@
 """
-Generate Part 2 financial JSON (technical/trading context) for one EGX ticker.
+Chat orchestration for end-to-end pipeline:
+user message -> infer ticker -> part1 -> part2 -> final decision.
+Updated to prioritize professional persona in chat reply.
+Optimized for strict language matching (Arabic/English) based on user prompt.
 """
 import json
-import os
-from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
 import logging
-import numpy as np
-import pandas as pd
-import yfinance as yf
-import time
+import os
+import re
+from typing import Any, Dict, Optional
 
-from config import OUTPUT_DIR, ALPHA_VANTAGE_API_KEY
 import requests
+
+from analyzer import analyze_news_batch, save_results
+from config import COMPANIES, GROQ_API_KEY, GROQ_MODEL
+from decision_engine import QUERY_RESPONSE_RULES, _build_investor_profile_context, generate_final_decision
+from part2_generator import generate_part2_financial_json, _fetch_from_yfinance
+from scraper import scrape_news, validate_news_articles
+
 logger = logging.getLogger(__name__)
 
-# إعداد جلسة عمل لتجنب الحظر (Rate Limit)
-session = requests.Session()
-session.headers.update({
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'
-})
+
+def _known_tickers() -> set:
+    return {value[1] for value in COMPANIES.values()}
 
 
-def _fetch_from_alpha_vantage(symbol: str, from_date: str) -> Optional[pd.DataFrame]:
-    """
-    Fallback: Fetch daily stock data from Alpha Vantage.
-    NOTE: Alpha Vantage's free tier does NOT support EGX stocks.
-    This function is kept for future premium upgrades or different symbols.
-    Returns a DataFrame with OHLCV data, or None if fetch fails.
-    """
-    if not ALPHA_VANTAGE_API_KEY:
-        logger.warning("Alpha Vantage API key not configured, cannot fallback")
-        return None
-    
+def _load_latest_part2_snapshot(ticker: str) -> Optional[Dict[str, Any]]:
+    output_dir = os.environ.get("OUTPUT_DIR", "output")
+    prefix = f"{ticker.upper()}_part2_financial_"
     try:
-        logger.info(f"Fetching data from Alpha Vantage for {symbol}")
-        
-        # Alpha Vantage endpoint
-        url = "https://www.alphavantage.co/query"
-        params = {
-            "function": "TIME_SERIES_DAILY",
-            "symbol": symbol,  # EGX tickers may not be supported by free tier
-            "apikey": ALPHA_VANTAGE_API_KEY,
-            "outputsize": "compact"  # Free tier: last 100 days. Use "full" for premium
-        }
-        
-        response = requests.get(url, params=params, timeout=30)
-        response.raise_for_status()
-        data = response.json()
-        
-        # Log response keys for debugging
-        logger.debug(f"Alpha Vantage response keys: {list(data.keys())}")
-        
-        # Check for API errors
-        if "Error Message" in data:
-            logger.error(f"Alpha Vantage error: {data['Error Message']}")
-            if "Invalid API call" in data["Error Message"]:
-                logger.error(f"Symbol {symbol} may not be supported by Alpha Vantage free tier (EGX stocks require premium)")
-            return None
-        
-        if "Note" in data:
-            logger.warning(f"Alpha Vantage note: {data['Note']}")
-            return None
-        
-        if "Information" in data:
-            logger.error(f"Alpha Vantage quota/feature limit: {data['Information']}")
-            return None
-        
-        if "Time Series (Daily)" not in data:
-            logger.error(f"No time series data in Alpha Vantage response. Keys present: {list(data.keys())}")
-            logger.debug(f"Alpha Vantage response preview: {str(data)[:500]}")
-            return None
-        
-        ts = data["Time Series (Daily)"]
-        
-        # Parse into DataFrame
-        records = []
-        for date_str, values in ts.items():
-            records.append({
-                'Date': pd.to_datetime(date_str),
-                'Open': float(values['1. open']),
-                'High': float(values['2. high']),
-                'Low': float(values['3. low']),
-                'Close': float(values['4. close']),
-                'Volume': int(values['5. volume'])
-            })
-        
-        df = pd.DataFrame(records)
-        if df.empty:
-            logger.error("Alpha Vantage returned empty DataFrame")
-            return None
-        
-        df = df.sort_values('Date').reset_index(drop=True)
-        df.set_index('Date', inplace=True)
-        
-        # Filter by from_date
-        from_dt = pd.to_datetime(from_date)
-        df = df[df.index >= from_dt]
-        
-        if df.empty:
-            logger.error(f"No data from {from_date} in Alpha Vantage response")
-            return None
-        
-        logger.info(f"Successfully fetched {len(df)} rows from Alpha Vantage for {symbol}")
-        return df
-    
-    except Exception as e:
-        logger.error(f"Alpha Vantage fetch failed: {e}")
+        candidates = [
+            os.path.join(output_dir, name)
+            for name in os.listdir(output_dir)
+            if name.startswith(prefix) and name.endswith(".json")
+        ]
+    except Exception:
+        return None
+
+    if not candidates:
+        return None
+
+    latest = max(candidates, key=os.path.getmtime)
+    try:
+        with open(latest, "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+        return {"output_file": latest, "payload": payload}
+    except Exception:
         return None
 
 
-def _fetch_from_yfinance(symbol: str, from_date: str) -> Optional[pd.DataFrame]:
-    """
-    Fetch daily stock data from Yahoo Finance.
-    Tries multiple symbol formats (SYMBOL, SYMBOL.CA, etc).
-    Returns a DataFrame with OHLCV data, or None if all attempts fail.
-    """
-    # Try multiple symbol formats for EGX stocks
-    symbols_to_try = [
-       
-        f"{symbol.upper().strip()}.EGX",  # COMI.EGX
-        f"{symbol.upper().strip()}.CA",  # COMI.CA
-        symbol.upper().strip(),  # COMI
+def _extract_tickers_from_message(user_message: str) -> list:
+    text = user_message.upper()
+    tickers = []
+    for ticker in sorted(_known_tickers()):
+        if re.search(rf"\b{re.escape(ticker)}\b", text):
+            tickers.append(ticker)
+    return tickers
+
+
+def _is_arabic(text: str) -> bool:
+    """إضافة جديدة: دالة مساعدة للتحقق مما إذا كان النص يحتوي على حروف عربية"""
+    return bool(re.search(r'[\u0600-\u06FF]', text))
+
+
+def classify_query_type(user_message: str) -> str:
+    text = user_message.strip().lower()
+    tickers = _extract_tickers_from_message(user_message)
+
+    if not tickers:
+        return "GENERAL_CHAT"
+
+    comparison_markers = ["compare", "comparison", "vs", "versus", "مقارنة", "قارن", "بين"]
+    if len(tickers) >= 2 or any(marker in text for marker in comparison_markers):
+        return "COMPARISON"
+
+    quick_summary_priority_markers = ["إيه أخبار", "ايه اخبار", "what's up with", "how is"]
+    if any(marker in text for marker in quick_summary_priority_markers):
+        return "QUICK_SUMMARY"
+
+    news_markers = ["news", "news on", "any news", "أخبار", "خبر", "اخبار", "what's new", "what is new"]
+    if any(marker in text for marker in news_markers):
+        return "NEWS_ONLY"
+
+    simple_fact_markers = [
+        "price", "current price", "volume", "market open", "market close",
+        "when does market open", "when is market open", "opening time", "closing time",
+        "سعر", "حجم التداول", "افتتاح", "إغلاق", "يفتح", "يغلق", "كم السعر", "كم حجم"
     ]
+    if any(marker in text for marker in simple_fact_markers):
+        return "SIMPLE_FACT"
+
+    quick_summary_markers = [
+        "how is", "how's", "is it up", "is it down", "up or down", "doing today",
+        "summary", "quick summary", "short summary", "أداء", "عامل", "ما الوضع", "ملخص"
+    ]
+    if any(marker in text for marker in quick_summary_markers):
+        return "QUICK_SUMMARY"
+
+    full_analysis_markers = [
+        "analyze", "analyse", "analysis", "report", "should i buy", "should i sell",
+        "buy", "sell", "recommend", "recommendation", "technical", "fundamental",
+        "حلل", "تحليل", "تقرير", "أنصح", "أشتري", "اشتري", "بيع", "توصية"
+    ]
+    if any(marker in text for marker in full_analysis_markers):
+        return "FULL_ANALYSIS"
+
+    return "FULL_ANALYSIS"
+
+
+def _format_simple_fact_reply(ticker: str, user_message: str) -> str:
+    text = user_message.lower()
+    is_ar = _is_arabic(user_message)
+
+    # تعديل: صياغة الردود باللغتين واختيار لغة المستخدم
+    if any(marker in text for marker in ["market open", "when does market open", "when is market open", "افتتاح", "يفتح"]):
+        if is_ar:
+            return "تفتح جلسة البورصة المصرية (EGX) عادة في الفترة الصباحية؛ يرجى مراجعة جدول البورصة لمعرفة توقيت الجلسة الدقيق اليوم."
+        return "The EGX market usually opens in the morning session; check the exchange schedule for the exact session time today."
+
+    df = _fetch_from_yfinance(ticker, from_date="2024-01-01")
+    if df is None or df.empty:
+        if is_ar:
+            return f"عذراً، لم أتمكن من جلب السعر الفوري لسهم {ticker} في الوقت الحالي."
+        return f"I couldn't fetch a live quote for {ticker} right now."
+
+    latest = df.iloc[-1]
+    price = float(latest.get("Close", 0.0))
+    volume = int(latest.get("Volume", 0) or 0)
     
-    for yf_symbol in symbols_to_try:
-        try:
-            logger.info(f"Trying Yahoo Finance with symbol: {yf_symbol}")
-            ticker_obj = yf.Ticker(yf_symbol)
-            raw = ticker_obj.history(
-                start=from_date,
-                end=datetime.today().strftime("%Y-%m-%d"),
-                raise_errors=True
-            )
-            
-            if raw.empty:
-                logger.warning(f"Yahoo Finance returned empty data for {yf_symbol}")
-                continue
-            
-            if isinstance(raw.columns, pd.MultiIndex):
-                raw.columns = raw.columns.get_level_values(0)
-            
-            df = raw[["Open", "High", "Low", "Close", "Volume"]].copy()
-            logger.info(f"Successfully fetched {len(df)} rows from Yahoo Finance ({yf_symbol})")
-            return df
+    if is_ar:
+        return f"يتم تداول سهم {ticker} اليوم بسعر {price:.2f} جنيه مصري، وبحجم تداول يقارب {volume:,} سهم."
+    return f"{ticker} is trading at {price:.2f} EGP today with volume around {volume:,} shares."
+
+
+def _format_quick_summary_reply(decision_result: Dict[str, Any], ticker: str, is_ar: bool = False) -> str:
+    """تعديل: تمرير معامل اللغوية لدعم الملخص السريع الموحد"""
+    result = decision_result.get("result", decision_result)
+    translator = result.get("decision_translator", {})
+    stock_analysis = str(result.get("stock_analysis", "")).strip()
+    simple_reason = str(translator.get("simple_reason", "")).strip()
+    recommendation = str(translator.get("buy_or_not", "HOLD")).strip()
+    
+    if is_ar:
+        lines = [
+            f"ملخص سريع لسهم {ticker}:",
+            stock_analysis[:180] if stock_analysis else f"التوصية: {recommendation}",
+            f"الإشارة: {recommendation}",
+        ]
+    else:
+        lines = [
+            f"{ticker} quick summary:",
+            stock_analysis[:180] if stock_analysis else f"Recommendation: {recommendation}",
+            f"Signal: {recommendation}",
+        ]
         
-        except Exception as e:
-            logger.debug(f"Yahoo Finance failed for {yf_symbol}: {e}")
-            continue
+    if simple_reason:
+        lines.append(simple_reason[:180])
+    return "\n".join(lines[:4])
+
+
+def _format_news_only_reply(articles: list, ticker: str, is_ar: bool = False) -> str:
+    """تعديل: دعم صياغة العناوين بالإنجليزية أو العربية"""
+    if not articles:
+        if is_ar:
+            return f"لم يتم العثور على أخبار حديثة تخص سهم {ticker}."
+        return f"No recent news items were found for {ticker}."
+
+    bullets = []
+    for item in articles[:5]:
+        headline = item.get("headline") or item.get("title") or item.get("short_summary") or "News item"
+        bullets.append(f"- {headline}")
+        
+    if is_ar:
+        return f"آخر الأخبار لسهم {ticker}:\n" + "\n".join(bullets)
+    return f"Recent news for {ticker}:\n" + "\n".join(bullets)
+
+
+def _format_comparison_reply(first_result: Dict[str, Any], second_result: Dict[str, Any], first_ticker: str, second_ticker: str, is_ar: bool = False) -> str:
+    """تعديل: تحويل نصوص المقارنة المباشرة بناءً على اللغة"""
+    first_company = (first_result.get("payload") or {}).get("companies", [{}])[0]
+    second_company = (second_result.get("payload") or {}).get("companies", [{}])[0]
+    first_price = (first_company.get("price") or {}).get("current_EGP")
+    second_price = (second_company.get("price") or {}).get("current_EGP")
+    first_signal = first_company.get("signal", "N/A")
+    second_signal = second_company.get("signal", "N/A")
     
-    logger.warning(f"All Yahoo Finance attempts failed for {symbol}")
+    if is_ar:
+        return (
+            f"مقارنة بين {first_ticker} و {second_ticker}\n"
+            f"- {first_ticker}: السعر={first_price}، الإشارة={first_signal}\n"
+            f"- {second_ticker}: السعر={second_price}، الإشارة={second_signal}"
+        )
+    return (
+        f"{first_ticker} vs {second_ticker}\n"
+        f"- {first_ticker}: price={first_price}, signal={first_signal}\n"
+        f"- {second_ticker}: price={second_price}, signal={second_signal}"
+    )
+
+
+def _format_full_analysis_reply(ticker: str, decision_result: Dict[str, Any], chat_history: Optional[list] = None, is_ar: bool = False) -> str:
+    """تعديل: إضافة العناوين بالإنجليزية والتبديل بين اللغتين بمرونة تامة"""
+    result = decision_result.get("result", {})
+    translator = result.get("decision_translator", {})
+
+    def clean_llm_text(text):
+        if not text:
+            return ""
+        text = re.sub(r'```json.*?```', '', text, flags=re.DOTALL)
+        text = re.sub(r'\{.*?"stock_analysis".*?\}', '', text, flags=re.DOTALL)
+        tags_to_remove = ["### stock_analysis", "### advanced_explanation", "### اربط الأخبار بالواقع"]
+        for tag in tags_to_remove:
+            text = text.replace(tag, "")
+        return text.strip()
+
+    analysis = clean_llm_text(result.get("stock_analysis", ""))
+    advanced = clean_llm_text(result.get("advanced_explanation", ""))
+    scenarios = result.get("scenario_analysis", [])
+    recommendations = translator.get("clear_recommendations", [])
+    warning = clean_llm_text(result.get("risk_warning", ""))
+
+    # تخصيص العناوين بناء على اللغة المستهدفة
+    if is_ar:
+        title_analysis = "📊 **التحليل الفني والأساسي:**"
+        title_advanced = "💡 **رؤية الخبراء والمستويات الرقمية:**"
+        title_scenarios = "🎯 **السيناريوهات المتوقعة:**"
+        title_recs = "✅ **توصيات إضافية:**"
+        title_warning = "⚠️ **تحذير المخاطر:**"
+        intro_text = f"نتائج تحليل سهم {ticker}"
+    else:
+        title_analysis = "📊 **Technical and Fundamental Analysis:**"
+        title_advanced = "💡 **Expert Insights & Numerical Levels:**"
+        title_scenarios = "🎯 **Expected Scenarios:**"
+        title_recs = "✅ **Additional Recommendations:**"
+        title_warning = "⚠️ **Risk Warning:**"
+        intro_text = f"Analysis results for ticker {ticker}"
+
+    detailed_content = f"{title_analysis}\n{analysis}\n\n"
+    if advanced and advanced[:100] != analysis[:100]:
+        detailed_content += f"{title_advanced}\n{advanced}\n\n"
+
+    if scenarios and isinstance(scenarios, list):
+        detailed_content += f"{title_scenarios}\n"
+        for s in scenarios:
+            if isinstance(s, dict):
+                detailed_content += f"- {s.get('scenario', '')}: **{s.get('action', '')}** ({s.get('reason', '')})\n"
+
+    if recommendations and isinstance(recommendations, list):
+        detailed_content += f"\n{title_recs}\n"
+        filtered_recs = [r for r in recommendations if "detailed analysis" not in r.lower()]
+        if filtered_recs:
+            detailed_content += "\n".join([f"- {r}" for r in filtered_recs])
+
+    if warning:
+        detailed_content += f"\n\n{title_warning}\n{warning}"
+
+    is_first_interaction = not chat_history or len(chat_history) < 2
+
+    if is_first_interaction:
+        if is_ar:
+            identity_intro = (
+                "أنا المستشار المالي الذكي للبورصة المصرية، مشروع تخرج تم تطويره "
+                "بواسطة طلاب كلية الذكاء الاصطناعي.\n\n"
+            )
+        else:
+            identity_intro = (
+                "I am the EGX Smart Financial Advisor, a graduation project developed "
+                "by Artificial Intelligence faculty students.\n\n"
+            )
+        return f"{identity_intro}{intro_text}\n\n{detailed_content}"
+
+    return f"{intro_text}\n\n{detailed_content}"
+
+
+def _companies_for_prompt() -> list:
+    return [
+        {"name_ar": value[0], "ticker": value[1]}
+        for value in COMPANIES.values()
+    ]
+
+
+def _fallback_match_ticker(user_message: str) -> Optional[str]:
+    text = user_message.upper()
+    for _, (name_ar, ticker) in COMPANIES.items():
+        if ticker in text or name_ar in user_message:
+            return ticker
     return None
 
 
-def _compute_rsi(close: pd.Series, period: int = 14) -> pd.Series:
-    delta = close.diff()
-    gain = delta.clip(lower=0).rolling(period).mean()
-    loss = -delta.clip(upper=0).rolling(period).mean()
-    rs = gain / loss.replace(0, np.nan)
-    return 100 - (100 / (1 + rs))
+def infer_ticker_from_message(user_message: str) -> Dict[str, Any]:
+    fallback = _fallback_match_ticker(user_message)
+    if not GROQ_API_KEY:
+        if fallback:
+            return {"ticker": fallback, "reason": "fallback_without_groq", "confidence": 0.6}
+        raise RuntimeError("GROQ_API_KEY is required to infer ticker from free text.")
 
-# Scoring and indicator helpers (from EGX_Trading_System_4.ipynb)
-RISK_PROFILES = {
-    "conservative": {
-        "strong_buy_threshold": 10,
-        "buy_threshold": 6,
-        "sell_threshold": -6,
-        "strong_sell_threshold": -10,
-    },
-    "moderate": {
-        "strong_buy_threshold": 8,
-        "buy_threshold": 4,
-        "sell_threshold": -4,
-        "strong_sell_threshold": -8,
-    },
-    "aggressive": {
-        "strong_buy_threshold": 6,
-        "buy_threshold": 2,
-        "sell_threshold": -2,
-        "strong_sell_threshold": -6,
-    },
-}
+    companies = _companies_for_prompt()
+    system_prompt = (
+        "You map Arabic/English user stock requests to EGX ticker symbols. "
+        "Return strict JSON only. Do not wrap code blocks with language names, just raw JSON."
+    )
+    user_prompt = (
+        "Pick exactly one ticker from the provided company list.\n"
+        "If uncertain, return the closest valid ticker with lower confidence.\n"
+        "Output schema: {\"ticker\": \"COMI\", \"confidence\": 0.0-1.0, \"reason\": \"...\"}\n\n"
+        f"Company list: {json.dumps(companies, ensure_ascii=False)}\n"
+        f"User message: {user_message}"
+    )
 
-CONFIDENCE_PRIORS = {
-    'STRONG BUY': 65.0,
-    'BUY': 55.0,
-    'SELL': 55.0,
-    'STRONG SELL': 65.0,
-    'HOLD': 0.0,
-}
+    response = requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "model": GROQ_MODEL,
+            "temperature": 0.0,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        },
+        timeout=60,
+    )
+    response.raise_for_status()
+    content = response.json()["choices"][0]["message"]["content"]
 
-
-def _calculate_adx(df: pd.DataFrame, period: int = 14) -> pd.DataFrame:
-    high, low, close = df['High'], df['Low'], df['Close']
-    plus_dm = high.diff()
-    minus_dm = -low.diff()
-    plus_dm[plus_dm < 0] = 0
-    minus_dm[minus_dm < 0] = 0
-    plus_dm[(plus_dm <= minus_dm)] = 0
-    minus_dm[(minus_dm < plus_dm)] = 0
-
-    tr = pd.concat([
-        high - low,
-        (high - close.shift(1)).abs(),
-        (low - close.shift(1)).abs()
-    ], axis=1).max(axis=1)
-
-    atr14 = tr.rolling(period).mean()
-    df['ADX_Plus'] = (plus_dm.rolling(period).mean() / atr14 * 100).fillna(0)
-    df['ADX_Minus'] = (minus_dm.rolling(period).mean() / atr14 * 100).fillna(0)
-
-    dx = ((df['ADX_Plus'] - df['ADX_Minus']).abs() / (df['ADX_Plus'] + df['ADX_Minus']).replace(0, np.nan) * 100)
-    df['ADX'] = dx.ewm(span=period, adjust=False).mean().fillna(0)
-    return df
-
-
-def _calculate_bollinger(df: pd.DataFrame, period: int = 20, std_dev: int = 2) -> pd.DataFrame:
-    df['BB_Mid'] = df['Close'].rolling(period).mean()
-    std = df['Close'].rolling(period).std()
-    df['BB_Upper'] = df['BB_Mid'] + (std * std_dev)
-    df['BB_Lower'] = df['BB_Mid'] - (std * std_dev)
-    df['BB_Width'] = (df['BB_Upper'] - df['BB_Lower']) / df['BB_Mid'].replace(0, np.nan)
-    df['BB_Position'] = ((df['Close'] - df['BB_Lower']) / (df['BB_Upper'] - df['BB_Lower'])).clip(0, 1)
-    return df
-
-
-def _calculate_obv(df: pd.DataFrame) -> pd.DataFrame:
-    direction = np.sign(df['Close'].diff())
-    df['OBV'] = (direction * df['Volume']).cumsum()
-    df['OBV_MA10'] = df['OBV'].rolling(10).mean()
-    df['Vol_MA20'] = df['Volume'].rolling(20).mean()
-    return df
-
-
-def _detect_trend(df: pd.DataFrame) -> str:
-    if len(df) < 50:
-        return "UNKNOWN"
-    close = df['Close'].iloc[-1]
-    sma20 = df['SMA20'].iloc[-1]
-    sma50 = df['SMA50'].iloc[-1]
-    if np.isnan(close) or np.isnan(sma20):
-        return "UNKNOWN"
-    if close > sma20 and sma20 > sma50:
-        return "UPTREND"
-    elif close < sma20 and sma20 < sma50:
-        return "DOWNTREND"
-    elif abs(close - sma20) / sma20 < 0.02:
-        return "CONSOLIDATING"
-    else:
-        return "SIDEWAYS"
-
-
-def _safe_iloc(series: pd.Series, idx: int) -> float:
     try:
-        val = series.iloc[idx]
-        return float(val) if pd.notna(val) else np.nan
-    except (IndexError, ValueError):
-        return np.nan
+        parsed = json.loads(content)
+    except json.JSONDecodeError:
+        if fallback:
+            return {"ticker": fallback, "reason": "fallback_after_bad_json", "confidence": 0.55}
+        raise RuntimeError("Ticker inference model output was not valid JSON")
 
+    ticker = str(parsed.get("ticker", "")).upper().strip()
+    valid_tickers = {value[1] for value in COMPANIES.values()}
+    if ticker not in valid_tickers:
+        if fallback:
+            return {"ticker": fallback, "reason": "fallback_after_invalid_ticker", "confidence": 0.55}
+        raise RuntimeError(f"Inferred invalid ticker: {ticker}")
 
-def _score_rsi(rsi: float) -> int:
-    if np.isnan(rsi):
-        return 0
-    if rsi < 30:
-        return 2
-    elif rsi < 45:
-        return 1
-    elif rsi < 55:
-        return 0
-    elif rsi < 70:
-        return -1
-    else:
-        return -2
-
-
-def _score_adx(adx: float, adx_plus: float, adx_minus: float) -> int:
-    if np.isnan(adx) or np.isnan(adx_plus) or np.isnan(adx_minus):
-        return 0
-    if adx_plus > adx_minus:
-        if adx > 25:
-            return 2
-        elif adx > 15:
-            return 1
-        else:
-            return 0
-    else:
-        if adx > 25:
-            return -2
-        elif adx > 15:
-            return -1
-        else:
-            return 0
-
-
-def _score_bollinger(bb_pos: float, regime_multiplier: float) -> int:
-    if np.isnan(bb_pos):
-        return 0
-    if bb_pos < 0.15:
-        raw = 2
-    elif bb_pos > 0.85:
-        raw = -2
-    else:
-        raw = 0
-    return int(round(raw * regime_multiplier))
-
-
-def _score_volume_spike(vol_now: float, vol_ma20: float) -> int:
-    if np.isnan(vol_ma20) or vol_ma20 == 0:
-        return 0
-    vol_ratio = vol_now / vol_ma20
-    if vol_ratio > 2.0:
-        return 2
-    elif vol_ratio > 1.3:
-        return 1
-    else:
-        return 0
-
-
-def _score_obv(obv_now: float, obv_ma10: float) -> int:
-    if np.isnan(obv_ma10) or obv_ma10 == 0:
-        return 0
-    if obv_now > obv_ma10:
-        return 1
-    elif obv_now < obv_ma10:
-        return -1
-    else:
-        return 0
-
-
-def _score_trend(trend: str) -> int:
-    if trend == "UPTREND":
-        return 2
-    elif trend == "DOWNTREND":
-        return -2
-    else:
-        return 0
-
-
-def _drawdown_midpoint(drawdown_tolerance: Optional[str], risk_profile: str) -> float:
-    normalized = str(drawdown_tolerance or "").strip().lower()
-    if normalized == "low":
-        return 0.05
-    if normalized == "medium":
-        return 0.15
-    if normalized == "high":
-        return 0.25
-
-    if risk_profile == "conservative":
-        return 0.05
-    if risk_profile == "aggressive":
-        return 0.25
-    return 0.15
-
-
-def _build_company_payload(symbol: str, risk_profile: str, df: pd.DataFrame, drawdown_tolerance: Optional[str] = None) -> Dict[str, Any]:
-    """Comprehensive 7-signal scoring matching EGX_Trading_System_4.ipynb."""
-    if len(df) < 5:
-        raise ValueError(f"Insufficient data: {len(df)} rows")
-    
-    if risk_profile not in RISK_PROFILES:
-        risk_profile = "moderate"
-    profile = RISK_PROFILES[risk_profile]
-    
-    latest_idx = -1
-    price = _safe_iloc(df['Close'], latest_idx)
-    rsi = _safe_iloc(df['RSI'], latest_idx)
-    adx = _safe_iloc(df['ADX'], latest_idx)
-    adx_plus = _safe_iloc(df['ADX_Plus'], latest_idx)
-    adx_minus = _safe_iloc(df['ADX_Minus'], latest_idx)
-    bb_pos = _safe_iloc(df['BB_Position'], latest_idx)
-    obv_now = _safe_iloc(df['OBV'], latest_idx)
-    obv_ma10 = _safe_iloc(df['OBV_MA10'], latest_idx)
-    vol_now = _safe_iloc(df['Volume'], latest_idx)
-    vol_ma20 = _safe_iloc(df['Vol_MA20'], latest_idx)
-    sma20 = _safe_iloc(df['SMA20'], latest_idx)
-    sma50 = _safe_iloc(df['SMA50'], latest_idx)
-    atr = _safe_iloc(df['ATR'], latest_idx)
-    
-    trend = _detect_trend(df)
-    bb_multiplier = 1.0 if trend in ('UPTREND', 'DOWNTREND') else (0.5 if trend == 'CONSOLIDATING' else 0.75)
-    
-    rsi_score = _score_rsi(rsi)
-    adx_score = _score_adx(adx, adx_plus, adx_minus)
-    bb_score = _score_bollinger(bb_pos, bb_multiplier)
-    vol_score = _score_volume_spike(vol_now, vol_ma20)
-    obv_score = _score_obv(obv_now, obv_ma10)
-    trend_score = _score_trend(trend)
-    
-    total_score = rsi_score + adx_score + bb_score + vol_score + obv_score + trend_score
-    
-    sbt = profile['strong_buy_threshold']
-    bt = profile['buy_threshold']
-    sst = profile['strong_sell_threshold']
-    st = profile['sell_threshold']
-    
-    if total_score >= sbt:
-        decision = 'STRONG BUY'
-    elif total_score >= bt:
-        decision = 'BUY'
-    elif total_score <= sst:
-        decision = 'STRONG SELL'
-    elif total_score <= st:
-        decision = 'SELL'
-    else:
-        decision = 'HOLD'
-    
-    if decision in ('BUY', 'STRONG BUY'):
-        action_existing = 'HOLD / ADD'
-        action_new = 'CONSIDER ENTRY — see position sizing'
-    elif decision in ('SELL', 'STRONG SELL'):
-        action_existing = 'EXIT position'
-        action_new = 'DO NOT ENTER — unfavourable conditions'
-    else:
-        action_existing = 'HOLD — no change needed'
-        action_new = 'WAIT — no clear edge yet'
-    
-    confidence = CONFIDENCE_PRIORS.get(decision, 50.0)
-    confidence_note = f"{decision} signal based on {abs(total_score)}-point composite score from 7 indicators."
-    drawdown_midpoint = _drawdown_midpoint(drawdown_tolerance, risk_profile)
-    stop_loss = round(price * (1 - drawdown_midpoint), 2) if not np.isnan(price) else None
-    
     return {
-        "symbol": symbol,
-        "exchange": "EGX (Egyptian Exchange)",
-        "analysis_date": df.index[-1].strftime("%Y-%m-%d"),
-        "price": {
-            "current_EGP": round(price, 2),
-            "sma20_EGP": round(sma20, 2) if not np.isnan(sma20) else None,
-            "sma50_EGP": round(sma50, 2) if not np.isnan(sma50) else None,
-        },
-        "trend": trend,
-        "signal": decision,
-        "action_existing_holders": action_existing,
-        "action_new_capital": action_new,
-        "confidence_pct": confidence,
-        "confidence_note": confidence_note,
-        "total_score": int(total_score),
-        "max_score": 14,
-        "sub_scores": {
-            "rsi": rsi_score,
-            "adx": adx_score,
-            "bollinger": bb_score,
-            "volume_spike": vol_score,
-            "obv": obv_score,
-            "trend": trend_score,
-        },
-        "indicators": {
-            "RSI_14": round(rsi, 1) if not np.isnan(rsi) else None,
-            "ADX_14": round(adx, 1) if not np.isnan(adx) else None,
-            "ADX_Plus": round(adx_plus, 1) if not np.isnan(adx_plus) else None,
-            "ADX_Minus": round(adx_minus, 1) if not np.isnan(adx_minus) else None,
-            "BB_Position": round(bb_pos, 2) if not np.isnan(bb_pos) else None,
-            "OBV": round(obv_now, 0) if not np.isnan(obv_now) else None,
-            "ATR_14_EGP": round(atr, 2) if not np.isnan(atr) else None,
-            "ATR_pct_of_price": round((atr / price) * 100, 2) if price and not np.isnan(atr) else None,
-        },
-        "risk_profile": risk_profile,
-        "regime": trend,
-        "regime_multipliers": {"bollinger": bb_multiplier},
-        "thresholds_used": {
-            "strong_buy": sbt,
-            "buy": bt,
-            "sell": st,
-            "strong_sell": sst,
-        },
-        "position_sizing": {
-            "applicable": decision in ("BUY", "STRONG BUY"),
-            "suggested_shares": None,
-            "position_cost_EGP": None,
-            "stop_loss_EGP": stop_loss,
-            "take_profit_EGP": None,
-            "capital_at_risk_EGP": None,
-            "risk_pct_of_capital": None,
-            "within_capital_limit": None,
-        },
-        "backtest": {
-            "signal_validation": "UNVALIDATED",
-            "validation_note": "Lightweight API mode — run EGX_Trading_System_4.ipynb for backtesting.",
-        },
-        "llm_prompt_summary": (
-            f"{symbol}: {decision} ({total_score}/14 points). "
-            f"Trend={trend} | RSI={round(rsi, 0) if not np.isnan(rsi) else 'N/A'} | "
-            f"ADX={round(adx, 0) if not np.isnan(adx) else 'N/A'} | Risk={risk_profile}"
-        ),
+        "ticker": ticker,
+        "confidence": float(parsed.get("confidence", 0.7)),
+        "reason": parsed.get("reason", "model_inference"),
     }
 
 
-def generate_part2_financial_json(
-    ticker: str,
-    user_risk_profile: str,
-    drawdown_tolerance: Optional[str] = None,
-    from_date: str = "2024-01-01",
+def _company_name_from_ticker(ticker: str) -> str:
+    for _, (name_ar, symbol) in COMPANIES.items():
+        if symbol == ticker.upper():
+            return name_ar
+    raise RuntimeError(f"Unknown ticker: {ticker}")
+
+
+def _is_general_chat(user_message: str) -> bool:
+    msg = user_message.lower().strip()
+    
+    if re.search(r'\b[A-Z]{4}\b', user_message):
+        return False
+    
+    financial_actions = [
+        "حلل", "سهم", "stock", "analyze", "بورصة", "أشتري", "اشتري", 
+        "بيع", "سعر", "قيمة", "أداء", "توقعات", "اتجاه", "شراء", "بيع",
+        "predict", "forecast", "technical", "fundamental", "buy", "sell"
+    ]
+    if any(word in msg for word in financial_actions):
+        return False
+    
+    help_keywords = [
+        "مين", "اسمك", "أهلا", "اهلا", "صباح", "مساء", "ازيك", "أزيك",
+        "hello", "hi", "who are you", "بتعمل ايه", "بتعمل إيه", "وظيفتك",
+        "كيف", "كيف يمكن", "كيف تستطيع", "كيفك", "مساعدة", "تساعد",
+        "how can you help", "what can you do", "what do you do", "capabilities",
+        "خدمات", "خدمة", "تقدم", "تقديم", "يمكنك", "يمكنك أن", "يمكنك ما",
+        "ماذا", "ما الذي", "شنو", "شنو اللي", "ليش", "ليه"
+    ]
+    
+    if any(word in msg for word in help_keywords):
+        return True
+    
+    if len(msg.split()) <= 2:
+        return True
+    
+    return True
+
+
+def run_general_chat(user_message: str, chat_history: Optional[list] = None) -> str:
+    is_ar = _is_arabic(user_message)
+    
+    # تعديل: توجيه الـ System Prompt ليلتزم بلغة العميل بنسبة 100% ويمنع دمج الحروف تماماً
+    system_prompt = (
+        "You are the 'EGX Smart Financial Advisor', a cutting-edge graduation project "
+        "developed by 4th-year students at the Faculty of Artificial Intelligence.\n"
+        "- Your goal is to be a friendly, professional financial assistant.\n"
+        f"- CRITICAL REQUIREMENT: The user is chatting in {'Arabic' if is_ar else 'English'}. "
+        f"You MUST reply ONLY in {'Arabic' if is_ar else 'English'}. "
+        f"Do NOT include any {'English words if replying in Arabic' if is_ar else 'Arabic words or letters if replying in English'}.\n"
+        "- If greeted, reply warmly.\n"
+        "- If asked what you do, explain that you analyze EGX stocks using AI, news scraping (Mubasher), "
+        "and financial data (yfinance).\n"
+        "- Always encourage the user to provide a stock ticker (e.g., FWRY, COMI) to start the deep analysis."
+    )
+
+    messages = [{"role": "system", "content": system_prompt}]
+    if chat_history:
+        messages.extend(chat_history[-3:])
+    messages.append({"role": "user", "content": user_message})
+
+    response = requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+        json={"model": GROQ_MODEL, "messages": messages, "temperature": 0.7},
+        timeout=90,
+    )
+    response.raise_for_status()
+    return response.json()["choices"][0]["message"]["content"]
+
+
+def run_chat_pipeline(
+    user_message: str,
+    risk_answers: Optional[Dict[str, str]] = None,
+    user_risk_profile: Optional[str] = None,
+    max_news: int = 20,
+    chat_history: Optional[list] = None,
 ) -> Dict[str, Any]:
-    symbol = ticker.upper().strip()
-    
-    # Try Yahoo Finance first
-    logger.info(f"Starting data fetch for {symbol}")
-    df = _fetch_from_yfinance(symbol, from_date)
-    
-    # Fallback to Alpha Vantage if yfinance fails
-    if df is None or df.empty:
-        logger.warning(f"Yahoo Finance failed, attempting Alpha Vantage fallback for {symbol}")
-        df = _fetch_from_alpha_vantage(symbol, from_date)
-    
-    # If both sources fail, raise error with helpful guidance
-    if df is None or df.empty:
-        error_msg = (
-            f"❌ Could not fetch data for {symbol} from any source.\n"
-            f"  • Yahoo Finance: Currently rate-limited (429 Too Many Requests). "
-            f"Please wait a few minutes and try again.\n"
-            f"  • Alpha Vantage: Free tier does not support EGX stocks. "
-            f"(Premium required: https://www.alphavantage.co/premium/)\n"
-            f"ℹ️  Recommended: Wait 5-10 minutes and retry."
+    query_type = classify_query_type(user_message)
+    is_ar = _is_arabic(user_message) # فحص اللغة بمجرد دخول الـ pipeline
+
+    if _is_general_chat(user_message):
+        general_reply = run_general_chat(user_message, chat_history)
+        return {
+            "ticker": "GENERAL",
+            "query_type": "GENERAL_CHAT",
+            "chat_reply": general_reply,
+            "final_result": {"status": "chat_only"},
+            "part1_news_output": None,
+            "part2_financial_output": None
+        }
+    inferred = infer_ticker_from_message(user_message)
+    ticker = inferred["ticker"]
+    company_name = _company_name_from_ticker(ticker)
+
+    if query_type == "SIMPLE_FACT":
+        fact_reply = _format_simple_fact_reply(ticker, user_message)
+        return {
+            "ticker_inference": inferred,
+            "ticker": ticker,
+            "query_type": query_type,
+            "chat_reply": fact_reply,
+            "final_result": {"status": "simple_fact", "query_type": query_type},
+            "part1_news_output": None,
+            "part2_financial_output": None,
+        }
+
+    if query_type == "NEWS_ONLY":
+        raw_articles = scrape_news(ticker, company_name, max_news=max_news)
+        articles = validate_news_articles(raw_articles)
+        if not articles:
+            raise RuntimeError(f"No news scraped for ticker {ticker}")
+        analyzed_news = analyze_news_batch(articles)
+        news_path = save_results(analyzed_news, ticker)
+        return {
+            "ticker_inference": inferred,
+            "ticker": ticker,
+            "query_type": query_type,
+            "chat_reply": _format_news_only_reply(analyzed_news, ticker, is_ar=is_ar),
+            "final_result": {"status": "news_only", "query_type": query_type},
+            "part1_news_output": news_path,
+            "part2_financial_output": None,
+        }
+
+    if query_type == "QUICK_SUMMARY":
+        try:
+            part2 = generate_part2_financial_json(
+                ticker=ticker,
+                user_risk_profile=user_risk_profile or "moderate",
+                drawdown_tolerance=(risk_answers or {}).get("max_drawdown_tolerance"),
+            )
+        except Exception:
+            part2 = _load_latest_part2_snapshot(ticker)
+            if not part2:
+                raise
+        return {
+            "ticker_inference": inferred,
+            "ticker": ticker,
+            "query_type": query_type,
+            "chat_reply": _format_quick_summary_reply(part2, ticker, is_ar=is_ar),
+            "final_result": {"status": "quick_summary", "query_type": query_type, "result": part2.get("payload")},
+            "part1_news_output": None,
+            "part2_financial_output": part2.get("output_file"),
+        }
+
+    if query_type == "COMPARISON":
+        tickers = _extract_tickers_from_message(user_message)
+        if len(tickers) < 2:
+            tickers = [ticker, ticker]
+        first_ticker, second_ticker = tickers[:2]
+        first_result = generate_part2_financial_json(
+            ticker=first_ticker,
+            user_risk_profile=user_risk_profile or "moderate",
+            drawdown_tolerance=(risk_answers or {}).get("max_drawdown_tolerance"),
         )
-        logger.error(error_msg)
-        raise RuntimeError(error_msg)
-    
-    # Calculate indicators
-    df["SMA20"] = df["Close"].rolling(20).mean()
-    df["SMA50"] = df["Close"].rolling(50, min_periods=10).mean()
-    df["EMA20"] = df["Close"].ewm(span=20, adjust=False).mean()
-    df["RSI"] = _compute_rsi(df["Close"])
-    df = _calculate_adx(df, period=14)
-    df = _calculate_bollinger(df, period=20, std_dev=2)
-    df = _calculate_obv(df)
-    tr = pd.concat([df["High"] - df["Low"], (df["High"] - df["Close"].shift(1)).abs(), (df["Low"] - df["Close"].shift(1)).abs()], axis=1).max(axis=1)
-    df["ATR"] = tr.rolling(14).mean()
-    df = df.dropna(subset=["Close", "RSI", "SMA20"])
+        second_result = generate_part2_financial_json(
+            ticker=second_ticker,
+            user_risk_profile=user_risk_profile or "moderate",
+            drawdown_tolerance=(risk_answers or {}).get("max_drawdown_tolerance"),
+        )
+        return {
+            "ticker_inference": inferred,
+            "ticker": ticker,
+            "query_type": query_type,
+            "chat_reply": _format_comparison_reply(first_result, second_result, first_ticker, second_ticker, is_ar=is_ar),
+            "final_result": {"status": "comparison", "query_type": query_type},
+            "part1_news_output": None,
+            "part2_financial_output": [first_result.get("output_file"), second_result.get("output_file")],
+        }
 
-    if df.empty:
-        raise RuntimeError("Insufficient indicator rows after preprocessing")
+    raw_articles = scrape_news(ticker, company_name, max_news=max_news)
+    articles = validate_news_articles(raw_articles)
+    if not articles:
+        raise RuntimeError(f"No news scraped for ticker {ticker}")
 
-    company_payload = _build_company_payload(symbol, user_risk_profile, df, drawdown_tolerance=drawdown_tolerance)
-    part2_json = {
-        "part": "financial_analysis",
-        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "period": f"{from_date} to {datetime.today().strftime('%Y-%m-%d')}",
-        "user_risk_profile": user_risk_profile,
-        "symbols_requested": [symbol],
-        "symbols_processed": [symbol],
-        "companies": [company_payload],
-    }
+    analyzed_news = analyze_news_batch(articles)
+    news_path = save_results(analyzed_news, ticker)
 
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"{symbol}_part2_financial_{ts}.json"
-    full_path = os.path.join(OUTPUT_DIR, filename)
-    with open(full_path, "w", encoding="utf-8") as handle:
-        json.dump(part2_json, handle, ensure_ascii=False, indent=2)
+    try:
+        part2 = generate_part2_financial_json(
+            ticker=ticker,
+            user_risk_profile=user_risk_profile or "moderate",
+            drawdown_tolerance=(risk_answers or {}).get("max_drawdown_tolerance"),
+        )
+    except Exception:
+        part2 = _load_latest_part2_snapshot(ticker)
+        if not part2:
+            raise
+    financial_path = part2["output_file"]
+
+    final_decision = generate_final_decision(
+        ticker=ticker,
+        news_json_path=news_path,
+        financial_json_path=financial_path,
+        user_risk_profile=user_risk_profile,
+        risk_answers=risk_answers,
+        query_type=query_type,
+        query_text=user_message,
+    )
+    chat_reply = _format_full_analysis_reply(ticker, final_decision, chat_history, is_ar=is_ar)
+
+    decision_result = final_decision.get("result", {})
+    if isinstance(decision_result, dict):
+        investor_profile_block = ((final_decision.get("prompt_debug") or {}).get("investor_profile") or {}).get("block")
+        if not investor_profile_block:
+            financial_company = (part2.get("payload") or {}).get("companies", [{}])[0]
+            investor_profile_block = _build_investor_profile_context(
+                user_risk_profile or "moderate",
+                risk_answers,
+                financial_company,
+            ).get("block")
+        if investor_profile_block:
+            decision_result.setdefault("investor_profile_block", investor_profile_block)
 
     return {
-        "output_file": full_path,
-        "payload": part2_json,
+        "ticker_inference": inferred,
+        "ticker": ticker,
+        "query_type": query_type,
+        "chat_reply": chat_reply,
+        "final_result": decision_result,
+        "part1_news_output": news_path,
+        "part2_financial_output": financial_path,
     }
