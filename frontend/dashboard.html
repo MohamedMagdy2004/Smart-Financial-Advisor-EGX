@@ -158,6 +158,10 @@
             width: 100%;
         }
 
+        .settings-title span {
+            white-space: nowrap;
+        }
+
         .settings-title::before {
             content: '';
             width: 3px;
@@ -237,6 +241,18 @@
             box-shadow: 0 0 6px #00d4ff !important;     
         }
 
+        .market-status-header {
+            justify-content: flex-start;
+        }
+
+        .market-status-header .live-tag {
+            margin-left: 0;
+        }
+
+        .market-status-header .header-controls {
+            margin-left: auto;
+        }
+
         .header-controls {
             display: flex;
             align-items: center;
@@ -288,9 +304,12 @@
         .collapsible-body.collapsed {
             max-height: 0;
             opacity: 0;
-            padding: 0;
-            border: none;
             overflow: hidden;
+            padding-top: 0;
+            padding-bottom: 0;
+            border-color: transparent;
+            visibility: hidden;
+            pointer-events: none;
         }
 
         .collapsible-body.portfolio-scroll {
@@ -517,6 +536,17 @@
             max-height: 360px !important;
             overflow-y: scroll !important;
             overflow-x: hidden !important;
+        }
+
+        .collapsible-body.collapsed,
+        .collapsible-body.portfolio-scroll.collapsed {
+            max-height: 0 !important;
+            overflow: hidden !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            border-color: transparent !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
         }
 
         .portfolio-header {
@@ -1420,8 +1450,10 @@
             <div class="sidebar-section-collapsible" id="riskEngineSection">
                 <div class="settings-title">
                     <span>⚙️ Risk Engine</span>
-                    <button class="toggle-btn" onclick="toggleSection(event, 'riskEngineSection')" title="Toggle section">−</button>
-                    <i class="fas fa-chevron-down arrow"></i>
+                    <div class="header-controls">
+                        <button class="toggle-btn" onclick="toggleSection(event, 'riskEngineSection')" title="Toggle section">−</button>
+                        <i class="fas fa-chevron-down arrow"></i>
+                    </div>
                 </div>
                 
                 <div class="collapsible-body">
@@ -1471,10 +1503,10 @@
             <div class="sidebar-divider"></div>
 
             <div class="sidebar-section-collapsible" id="marketStatusSection">
-                <div class="status-header">
+                <div class="status-header market-status-header">
                     <span><i class="fas fa-chart-line"></i>⚙️ MARKET STATUS</span>
+                    <span class="live-tag">LIVE</span>
                     <div class="header-controls">
-                        <span class="live-tag">LIVE</span>
                         <button class="toggle-btn" onclick="toggleSection(event, 'marketStatusSection')" title="Toggle section">−</button>
                         <i class="fas fa-chevron-down arrow"></i>
                     </div>
@@ -2148,6 +2180,12 @@
         }
 
         // Watchlist Functions
+        function analyzeTicker(ticker) {
+            if (!inputEl) return;
+            inputEl.value = `What is the latest on ${ticker}`;
+            inputEl.focus();
+        }
+
         async function loadWatchlist() {
             const response = await fetch('/api/watchlist/');
             const tickers = await response.json();
@@ -2159,7 +2197,7 @@
                 container.innerHTML += `
                     <div class="watchlist-item" onclick="analyzeTicker('${item.ticker}')">
                         <span class="ticker-badge">${item.ticker}</span>
-                        <i class="fas fa-times remove-icon" onclick="removeFromWatchlist('${item.id}')"></i>
+                        <i class="fas fa-times remove-icon" onclick="deleteFromWatchlist('${item.id}')"></i>
                     </div>`;
             });
         }
@@ -2594,11 +2632,11 @@
             }
 
             // تأثير الـ Accordion للقوائم الجانبية المتداخلة
-            const sections = document.querySelectorAll('.sidebar-section-collapsible');
-            sections.forEach((section) => {
+            const collapsibleSections = document.querySelectorAll('.sidebar-section-collapsible');
+            collapsibleSections.forEach((section) => {
                 section.addEventListener('toggle', () => {
                     if (section.open) {
-                        sections.forEach((otherSection) => {
+                        collapsibleSections.forEach((otherSection) => {
                             if (otherSection !== section) {
                                 otherSection.open = false;
                             }
