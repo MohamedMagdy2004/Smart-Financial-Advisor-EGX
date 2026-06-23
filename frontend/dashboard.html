@@ -154,6 +154,8 @@
             gap: 8px;
             text-transform: uppercase;
             letter-spacing: 2px;
+            justify-content: space-between;
+            width: 100%;
         }
 
         .settings-title::before {
@@ -223,6 +225,8 @@
             gap: 8px;
             text-transform: uppercase;
             letter-spacing: 2px;
+            justify-content: space-between;
+            width: 100%;
         }
         .status-header::before {  
             content: '' !important;
@@ -232,6 +236,40 @@
             border-radius: 2px !important;
             box-shadow: 0 0 6px #00d4ff !important;     
         }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-left: auto;
+        }
+
+        .toggle-btn {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            color: #00d4ff;
+            width: 24px;
+            height: 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.2s;
+            padding: 0;
+        }
+
+        .toggle-btn:hover {
+            background: rgba(0, 212, 255, 0.2);
+            border-color: rgba(0, 212, 255, 0.5);
+            box-shadow: 0 0 8px rgba(0, 212, 255, 0.3);
+        }
+
+        .toggle-btn:active {
+            transform: scale(0.95);
+        }
     
         .collapsible-body{
             width: 100%;
@@ -240,7 +278,19 @@
             border-radius: 8px;
             color: #fff;
             font-size: 12px;
-            font-family: 'Inter', sans-serif; 
+            font-family: 'Inter', sans-serif;
+            max-height: 1000px;
+            overflow: hidden;
+            transition: max-height 0.3s ease, opacity 0.3s ease;
+            opacity: 1;
+        }
+
+        .collapsible-body.collapsed {
+            max-height: 0;
+            opacity: 0;
+            padding: 0;
+            border: none;
+            overflow: hidden;
         }
 
         .collapsible-body.portfolio-scroll {
@@ -456,14 +506,14 @@
             text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
         }
         /* 1. إعداد الحاوية الكلية للمحفظة لكي تلتزم بحدود الشاشة وتمنع الاختفاء */
-        .sidebar-section-collapsible[open] .collapsible-body {
+        .collapsible-body {
             max-height: 480px !important;    /* تحديد أقصى ارتفاع مسموح به للمنسدلة كاملة */
             display: flex !important;
             flex-direction: column !important;
             overflow: hidden !important;     /* منع الخروج العشوائي للعناصر لأسفل */
         }
 
-        .sidebar-section-collapsible[open] .collapsible-body.portfolio-scroll {
+        .collapsible-body.portfolio-scroll {
             max-height: 360px !important;
             overflow-y: scroll !important;
             overflow-x: hidden !important;
@@ -1367,11 +1417,12 @@
                 <div class="user-email" id="userEmail">Loading...</div>
                 <button class="logout-btn" id="logoutBtn">Logout</button>
             </div>
-            <details class="sidebar-section-collapsible">
-                <summary class="settings-title">
+            <div class="sidebar-section-collapsible" id="riskEngineSection">
+                <div class="settings-title">
                     <span>⚙️ Risk Engine</span>
+                    <button class="toggle-btn" onclick="toggleSection(event, 'riskEngineSection')" title="Toggle section">−</button>
                     <i class="fas fa-chevron-down arrow"></i>
-                </summary>
+                </div>
                 
                 <div class="collapsible-body">
                     <div class="setting-group">
@@ -1415,18 +1466,19 @@
                         🔌 API: <span id="apiStatus">Checking...</span>
                     </div>
                 </div>
-            </details>
+            </div>
 
             <div class="sidebar-divider"></div>
 
-            <details class="sidebar-section-collapsible">
-                <summary class="status-header">
+            <div class="sidebar-section-collapsible" id="marketStatusSection">
+                <div class="status-header">
                     <span><i class="fas fa-chart-line"></i>⚙️ MARKET STATUS</span>
                     <div class="header-controls">
                         <span class="live-tag">LIVE</span>
+                        <button class="toggle-btn" onclick="toggleSection(event, 'marketStatusSection')" title="Toggle section">−</button>
                         <i class="fas fa-chevron-down arrow"></i>
                     </div>
-                </summary>
+                </div>
 
                 <div class="collapsible-body">
                     <div class="market-grid">
@@ -1483,17 +1535,18 @@
                         <i class="far fa-clock"></i> Last Update: 15/05/2026 14:30
                     </div>
                 </div>
-            </details>
+            </div>
 
             <div class="sidebar-divider"></div>
 
-            <details class="sidebar-section-collapsible">
-                <summary class="status-header">
+            <div class="sidebar-section-collapsible" id="watchlistSection">
+                <div class="status-header">
                     <span><i class="fas fa-heart"></i>⚙️ MY WATCHLIST</span>
                     <div class="header-controls">
+                        <button class="toggle-btn" onclick="toggleSection(event, 'watchlistSection')" title="Toggle section">−</button>
                         <i class="fas fa-chevron-down arrow"></i>
                     </div>
-                </summary>
+                </div>
 
                 <div class="collapsible-body">
                     <div class="watchlist-container" id="watchlistContainer">
@@ -1504,16 +1557,17 @@
                         <button onclick="addToWatchlist()">✚ Add</button>
                     </div>
                 </div>
-            </details>
+            </div>
 
             <div class="sidebar-divider"></div>
-              <details class="sidebar-section-collapsible">
-                <summary class="status-header">
+              <div class="sidebar-section-collapsible" id="portfolioSection">
+                <div class="status-header">
                     <span><i class="fas fa-briefcase"></i>⚙️ MY PORTFOLIO</span>
                     <div class="header-controls">
+                        <button class="toggle-btn" onclick="toggleSection(event, 'portfolioSection')" title="Toggle section">−</button>
                         <i class="fas fa-chevron-down arrow"></i>
                     </div>
-                </summary>
+                </div>
 
                 <div class="collapsible-body portfolio-scroll">
                     <div id="portfolioSummaryView">
@@ -1559,7 +1613,7 @@
                         </div>
                     </div>
                 </div>
-            </details>
+            </div>
         </div>
 
         <!-- MIDDLE CONTENT (Chat) -->
@@ -1570,7 +1624,7 @@
                     <img src="Chat bot logo.jpg" alt="EGX AI Bot" style="width: 100%; height: 100%; object-fit: cover; border-radius: 100px;">
                     </div>
                     <div class="logo-text">
-                        <h1>EGX AI FINANCIAL BOT</h1>
+                        <h1>namaa EGX advisor</h1>
                         <p>Egyptian Stock Exchange Intelligence</p>
                     </div>
                 </div>
@@ -1600,7 +1654,7 @@
 
                 <div class="messages" id="messages">
                     <div class="msg bot">
-                        🤖 <strong>EGX AI Bot Online</strong><br>
+                        🤖 <strong>namaa EGX advisor Online</strong><br>
                         Ask me about Egyptian stocks:<br>
                         • "What is the latest on COMI"<br>
                         • "Should I buy SWDY?"<br>
@@ -1653,6 +1707,23 @@
             }
         }
 
+        // 1.5 Toggle Section Function
+        function toggleSection(event, sectionId) {
+            event.preventDefault();
+            event.stopPropagation();
+            const section = document.getElementById(sectionId);
+            if (section) {
+                const body = section.querySelector('.collapsible-body');
+                const btn = event.target;
+                if (body) {
+                    // Toggle visibility of body only
+                    body.classList.toggle('collapsed');
+                    // Update button text
+                    btn.textContent = body.classList.contains('collapsed') ? '+' : '−';
+                }
+            }
+        }
+
         // 2. API & Global Config
         const API_BASE = "http://localhost:8000";
         const messagesEl = document.getElementById("messages");
@@ -1681,7 +1752,7 @@
             const welcomeMsg = document.createElement("div");
             welcomeMsg.className = "msg bot";
             welcomeMsg.innerHTML = `
-            🤖 <strong>EGX AI Bot Online</strong><br><br>
+            🤖 <strong>namaa EGX advisor Online</strong><br><br>
             Ask me about Egyptian stocks:<br>
             • "What is the latest on COMI?"<br>
             • "Should I buy SWDY?"<br>
@@ -2447,6 +2518,17 @@
             checkApi();
             loadWatchlist();
             loadPortfolio();
+            
+            // Initialize toggle button states (all expanded by default)
+            const sections = ['riskEngineSection', 'marketStatusSection', 'watchlistSection', 'portfolioSection'];
+            sections.forEach(sectionId => {
+                const section = document.getElementById(sectionId);
+                const btn = section?.querySelector('.toggle-btn');
+                if (section && btn) {
+                    // Button shows '−' by default (sections are expanded)
+                    btn.textContent = '−';
+                }
+            });
             
             // إدارة المحادثات النشطة عند التحميل الأولي للمنصة
             let conversations = loadConversations();

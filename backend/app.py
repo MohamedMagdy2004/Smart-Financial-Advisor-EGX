@@ -29,6 +29,7 @@ from scraper import scrape_news, validate_news_articles
 from analyzer import analyze_news_batch, save_results
 from decision_engine import generate_final_decision
 from chat_orchestrator import run_chat_pipeline
+from external_prices import fetch_stock_price
 
 # Configure logging
 logging.basicConfig(
@@ -169,6 +170,25 @@ async def list_companies():
             }
             for k, v in COMPANIES.items()
         ]
+    }
+
+
+@app.get("/stocks/prices", tags=["Stocks"])
+async def get_stock_prices(tickers: str = Query("COMI,SWDY", description="Comma-separated tickers like COMI,SWDY")):
+    """Return current external prices for requested stock tickers."""
+    requested = [ticker.strip().upper() for ticker in tickers.split(",") if ticker.strip()]
+    if not requested:
+        raise HTTPException(status_code=400, detail="At least one ticker is required")
+
+    prices = {}
+    for ticker in requested:
+        price = fetch_stock_price(ticker)
+        prices[ticker] = price
+
+    return {
+        "tickers": requested,
+        "prices": prices,
+        "source": "yahoo-finance"
     }
 
 

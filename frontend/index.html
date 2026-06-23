@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>EGX AI Platform | Financial Market Intelligence</title>
+    <title>namaa EGX advisor | Financial Market Intelligence</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -411,7 +411,7 @@
                     <img src="Chat bot logo.jpg" alt="EGX AI Bot">
                 </div>
                 <div class="logo-text">
-                    <h2>EGX AI BOT</h2>
+                    <h2>namaa EGX advisor</h2>
                     <p>Active • Market Intelligence</p>
                 </div>
             </div>
@@ -440,8 +440,8 @@
 
             <div class="watchlist">
                 <h4><i class="fas fa-star"></i> MY WATCHLIST</h4>
-                <div class="stock-item"><span>COMI</span><span class="positive">▲ 82.45 EGP</span></div>
-                <div class="stock-item"><span>SWDY</span><span class="positive">▲ 89.15 EGP</span></div>
+                <div class="stock-item"><span>COMI</span><span class="positive" id="watch-comi-price">▲ 82.45 EGP</span></div>
+                <div class="stock-item"><span>SWDY</span><span class="positive" id="watch-swdy-price">▲ 89.15 EGP</span></div>
                 <div class="stock-item"><span>TMGH</span><span class="negative">▼ 18.30 EGP</span></div>
                 <div class="stock-item"><span>ABUK</span><span class="positive">▲ 63.20 EGP</span></div>
             </div>
@@ -455,7 +455,7 @@
 
         <div class="main-content">
             <div class="project-bio">
-                <h1>🤖 EGX AI Financial Analyst</h1>
+                <h1>namaa EGX advisor</h1>
                 <p>An intelligent assistant specialized in analyzing Egyptian Exchange (EGX) stocks using advanced AI models. The platform provides real-time insights, technical charts, live market indices, and stock screening — inspired by platforms like TradingView. Click the "Login to Chatbot" button to access the AI-powered chat interface for personalized stock recommendations and market Q&A.</p>
                 <div class="badge-ai"><i class="fas fa-chart-simple"></i> Technical Analysis | Live Data | AI Predictions | EGX Focus</div>
             </div>
@@ -485,8 +485,8 @@
                         <tr><th style="text-align: left;">Company</th><th style="text-align: right;">Price (EGP)</th><th style="text-align: right;">Change %</th><th style="text-align: right;">Volume</th><th style="text-align: right;">AI Signal</th></tr>
                     </thead>
                     <tbody>
-                        <tr><td style="text-align: left; font-weight: 500;">COMI (CIB)</td><td style="text-align: right;">82.45</td><td style="text-align: right;" class="positive">▲ +2.30%</td><td style="text-align: right; color:#7e8aa8;">1.2M</td><td style="text-align: right;" class="positive">BUY</td></tr>
-                        <tr><td style="text-align: left; font-weight: 500;">SWDY (Elsewedy)</td><td style="text-align: right;">89.15</td><td style="text-align: right;" class="positive">▲ +1.75%</td><td style="text-align: right; color:#7e8aa8;">892k</td><td style="text-align: right;" class="positive">ACCUMULATE</td></tr>
+                        <tr><td style="text-align: left; font-weight: 500;">COMI (CIB)</td><td style="text-align: right;" id="table-comi-price">82.45</td><td style="text-align: right;" class="positive">▲ +2.30%</td><td style="text-align: right; color:#7e8aa8;">1.2M</td><td style="text-align: right;" class="positive">BUY</td></tr>
+                        <tr><td style="text-align: left; font-weight: 500;">SWDY (Elsewedy)</td><td style="text-align: right;" id="table-swdy-price">89.15</td><td style="text-align: right;" class="positive">▲ +1.75%</td><td style="text-align: right; color:#7e8aa8;">892k</td><td style="text-align: right;" class="positive">ACCUMULATE</td></tr>
                         <tr><td style="text-align: left; font-weight: 500;">TMGH (Talaat Moustafa)</td><td style="text-align: right;">18.30</td><td style="text-align: right;" class="negative">▼ -0.85%</td><td style="text-align: right; color:#7e8aa8;">2.1M</td><td style="text-align: right; color:#8fa1c3;">NEUTRAL</td></tr>
                         <tr><td style="text-align: left; font-weight: 500;">ABUK (Abu Qir)</td><td style="text-align: right;">63.20</td><td style="text-align: right;" class="positive">▲ +3.10%</td><td style="text-align: right; color:#7e8aa8;">305k</td><td style="text-align: right;" class="positive">STRONG BUY</td></tr>
                     </tbody>
@@ -540,14 +540,20 @@
         });
 
         // ================= CHARTS ENGINE =================
+        const fallbackPrices = { COMI: 82.45, SWDY: 89.15 };
+        const chartData = {
+            COMI: [75.2, 77.8, 76.5, 80.1, 79.6, 81.8, fallbackPrices.COMI],
+            SWDY: [84.2, 85.0, 84.9, 87.3, 88.1, 88.7, fallbackPrices.SWDY]
+        };
+
         const ctxCom = document.getElementById('comChart').getContext('2d');
-        new Chart(ctxCom, {
+        const comChart = new Chart(ctxCom, {
             type: 'line',
             data: {
                 labels: ['1 Oct', '5 Oct', '10 Oct', '15 Oct', '20 Oct', '25 Oct', '30 Oct'],
                 datasets: [{
                     label: 'COMI (EGP)',
-                    data: [75.2, 77.8, 76.5, 80.1, 79.6, 81.8, 82.45],
+                    data: chartData.COMI,
                     borderColor: '#0066ff',
                     backgroundColor: 'rgba(0, 102, 255, 0.03)',
                     fill: true,
@@ -561,13 +567,13 @@
         });
 
         const ctxSwdy = document.getElementById('swdyChart').getContext('2d');
-        new Chart(ctxSwdy, {
+        const swdyChart = new Chart(ctxSwdy, {
             type: 'line',
             data: {
                 labels: ['1 Oct', '6 Oct', '11 Oct', '16 Oct', '21 Oct', '26 Oct', 'Today'],
                 datasets: [{
                     label: 'SWDY (EGP)',
-                    data: [84.2, 85.0, 84.9, 87.3, 88.1, 88.7, 89.15],
+                    data: chartData.SWDY,
                     borderColor: '#f1c40f',
                     backgroundColor: 'rgba(241,196,15,0.02)',
                     fill: true,
@@ -577,6 +583,34 @@
                 }]
             },
             options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: '#6c86a3', font: { size: 10 } } }, y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#6c86a3', font: { size: 10 } } } } }
+        });
+
+        async function loadStockPrices() {
+            try {
+                const response = await fetch('http://127.0.0.1:8000/stocks/prices?tickers=COMI,SWDY');
+                if (!response.ok) throw new Error('Failed to load stock prices');
+                const data = await response.json();
+
+                const prices = data.prices || {};
+                const comiPrice = prices.COMI ?? fallbackPrices.COMI;
+                const swdyPrice = prices.SWDY ?? fallbackPrices.SWDY;
+
+                document.getElementById('watch-comi-price').textContent = `▲ ${comiPrice.toFixed(2)} EGP`;
+                document.getElementById('watch-swdy-price').textContent = `▲ ${swdyPrice.toFixed(2)} EGP`;
+                document.getElementById('table-comi-price').textContent = comiPrice.toFixed(2);
+                document.getElementById('table-swdy-price').textContent = swdyPrice.toFixed(2);
+
+                comChart.data.datasets[0].data[comChart.data.datasets[0].data.length - 1] = comiPrice;
+                swdyChart.data.datasets[0].data[swdyChart.data.datasets[0].data.length - 1] = swdyPrice;
+                comChart.update();
+                swdyChart.update();
+            } catch (error) {
+                console.error('Could not load stock prices:', error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadStockPrices();
         });
     </script>
 </body>
